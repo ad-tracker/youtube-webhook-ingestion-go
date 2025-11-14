@@ -47,14 +47,14 @@ func (mp *MessagePublisher) connect() error {
 
 	ch, err := conn.Channel()
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("failed to open channel: %w", err)
 	}
 
 	// Enable publisher confirms
 	if err := ch.Confirm(false); err != nil {
-		ch.Close()
-		conn.Close()
+		_ = ch.Close()
+		_ = conn.Close()
 		return fmt.Errorf("failed to enable publisher confirms: %w", err)
 	}
 
@@ -68,8 +68,8 @@ func (mp *MessagePublisher) connect() error {
 		false,              // no-wait
 		nil,                // arguments
 	); err != nil {
-		ch.Close()
-		conn.Close()
+		_ = ch.Close()
+		_ = conn.Close()
 		return fmt.Errorf("failed to declare exchange: %w", err)
 	}
 
@@ -86,8 +86,8 @@ func (mp *MessagePublisher) connect() error {
 		},
 	)
 	if err != nil {
-		ch.Close()
-		conn.Close()
+		_ = ch.Close()
+		_ = conn.Close()
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
 
@@ -99,8 +99,8 @@ func (mp *MessagePublisher) connect() error {
 		false,
 		nil,
 	); err != nil {
-		ch.Close()
-		conn.Close()
+		_ = ch.Close()
+		_ = conn.Close()
 		return fmt.Errorf("failed to bind queue: %w", err)
 	}
 

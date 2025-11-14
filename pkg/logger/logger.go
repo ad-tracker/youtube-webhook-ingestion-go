@@ -40,8 +40,9 @@ func Init(level string, logFile string) error {
 	return nil
 }
 
-func Sync() {
+func Sync() error {
 	if Log != nil {
-		_ = Log.Sync()
+		return Log.Sync()
 	}
+	return nil
 }
