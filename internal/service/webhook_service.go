@@ -93,16 +93,18 @@ func (ws *WebhookService) ProcessWebhook(ctx context.Context, payload *models.We
 			zap.Error(err),
 			zap.String("eventId", eventID.String()),
 		)
-	} else if exists {
+	}
+	if err == nil && exists {
 		logger.Log.Info("Duplicate event detected (skipping insert)",
 			zap.String("eventHash", event.EventHash),
 			zap.String("channelId", payload.ChannelID),
 		)
-	} else {
+	}
+	if err == nil && !exists {
 		// Insert if not duplicate
-		if err := ws.repo.CreateEvent(ctx, event); err != nil {
+		if createErr := ws.repo.CreateEvent(ctx, event); createErr != nil {
 			logger.Log.Error("Failed to create immutable event",
-				zap.Error(err),
+				zap.Error(createErr),
 				zap.String("eventId", eventID.String()),
 			)
 		} else {
