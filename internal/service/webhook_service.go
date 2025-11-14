@@ -177,6 +177,8 @@ func (e *ValidationError) Error() string {
 }
 
 // ProcessingError represents an error that occurred during webhook processing.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type ProcessingError struct {
 	Message string
 	Cause   error

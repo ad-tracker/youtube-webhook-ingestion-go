@@ -9,6 +9,8 @@ import (
 )
 
 // Config holds all configuration for the application.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
@@ -24,6 +26,8 @@ type ServerConfig struct {
 }
 
 // DatabaseConfig contains database connection configuration.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type DatabaseConfig struct {
 	Host           string
 	Port           int
@@ -37,6 +41,8 @@ type DatabaseConfig struct {
 }
 
 // RabbitMQConfig contains RabbitMQ connection and queue configuration.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type RabbitMQConfig struct {
 	Host       string
 	Port       int

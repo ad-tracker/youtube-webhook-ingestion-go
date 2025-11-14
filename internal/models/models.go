@@ -29,6 +29,8 @@ const (
 )
 
 // WebhookEvent represents transient webhook processing state.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type WebhookEvent struct {
 	ID               uuid.UUID        `json:"id"`
 	VideoID          string           `json:"video_id"`
@@ -47,6 +49,8 @@ type WebhookEvent struct {
 }
 
 // Event represents immutable audit trail.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type Event struct {
 	ID         uuid.UUID `json:"id"`
 	EventType  string    `json:"event_type"`
@@ -59,6 +63,8 @@ type Event struct {
 }
 
 // Subscription represents PubSubHubbub subscription management.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type Subscription struct {
 	ID                 uuid.UUID          `json:"id"`
 	ChannelID          string             `json:"channel_id"`
@@ -86,6 +92,8 @@ type WebhookPayloadDTO struct {
 }
 
 // WebhookResponseDTO represents the webhook response.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type WebhookResponseDTO struct {
 	EventID    uuid.UUID `json:"eventId"`
 	ReceivedAt time.Time `json:"receivedAt"`
@@ -94,6 +102,8 @@ type WebhookResponseDTO struct {
 }
 
 // ErrorResponse represents an error response.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type ErrorResponse struct {
 	Timestamp time.Time `json:"timestamp"`
 	Status    int       `json:"status"`
