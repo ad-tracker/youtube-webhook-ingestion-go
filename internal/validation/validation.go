@@ -1,3 +1,4 @@
+// Package validation provides webhook payload validation functionality.
 package validation
 
 import (
@@ -14,11 +15,13 @@ var (
 	eventTypeRegex = regexp.MustCompile(`^[A-Z_]+$`)
 )
 
+// Validator validates webhook payloads against defined rules and constraints.
 type Validator struct {
 	maxPayloadSize    int64
 	validationEnabled bool
 }
 
+// New creates a new Validator instance with the specified configuration.
 func New(maxPayloadSize int64, enabled bool) *Validator {
 	return &Validator{
 		maxPayloadSize:    maxPayloadSize,
@@ -26,6 +29,7 @@ func New(maxPayloadSize int64, enabled bool) *Validator {
 	}
 }
 
+// ValidatePayload validates a webhook payload against all defined rules.
 func (v *Validator) ValidatePayload(payload *models.WebhookPayloadDTO) error {
 	if !v.validationEnabled {
 		return nil
@@ -67,14 +71,17 @@ func (v *Validator) ValidatePayload(payload *models.WebhookPayloadDTO) error {
 	return nil
 }
 
+// IsValidVideoID checks if a video ID matches the expected format.
 func (v *Validator) IsValidVideoID(videoID string) bool {
 	return videoIDRegex.MatchString(videoID)
 }
 
+// IsValidChannelID checks if a channel ID matches the expected format.
 func (v *Validator) IsValidChannelID(channelID string) bool {
 	return channelIDRegex.MatchString(channelID)
 }
 
+// IsValidEventType checks if an event type matches the expected format.
 func (v *Validator) IsValidEventType(eventType string) bool {
 	return eventTypeRegex.MatchString(eventType)
 }

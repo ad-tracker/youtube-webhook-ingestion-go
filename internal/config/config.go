@@ -1,3 +1,4 @@
+// Package config provides configuration management for the application.
 package config
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config holds all configuration for the application.
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
@@ -15,43 +17,49 @@ type Config struct {
 	Logging  LoggingConfig
 }
 
+// ServerConfig contains HTTP server configuration.
 type ServerConfig struct {
 	Port            int
 	ShutdownTimeout time.Duration
 }
 
+// DatabaseConfig contains database connection configuration.
 type DatabaseConfig struct {
-	Host            string
-	Port            int
-	Name            string
-	User            string
-	Password        string
-	MaxConnections  int
-	MinConnections  int
-	MaxIdleTime     time.Duration
-	MaxLifetime     time.Duration
+	Host           string
+	Port           int
+	Name           string
+	User           string
+	Password       string
+	MaxConnections int
+	MinConnections int
+	MaxIdleTime    time.Duration
+	MaxLifetime    time.Duration
 }
 
+// RabbitMQConfig contains RabbitMQ connection and queue configuration.
 type RabbitMQConfig struct {
-	Host        string
-	Port        int
-	User        string
-	Password    string
-	Exchange    string
-	Queue       string
-	RoutingKey  string
+	Host       string
+	Port       int
+	User       string
+	Password   string
+	Exchange   string
+	Queue      string
+	RoutingKey string
 }
 
+// WebhookConfig contains webhook processing configuration.
 type WebhookConfig struct {
 	MaxPayloadSize    int64
 	ValidationEnabled bool
 }
 
+// LoggingConfig contains logging configuration.
 type LoggingConfig struct {
 	Level string
 	File  string
 }
 
+// Load loads configuration from file and environment variables.
 func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")

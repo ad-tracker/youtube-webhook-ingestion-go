@@ -1,3 +1,4 @@
+// Package main is the entry point for the YouTube webhook ingestion service.
 package main
 
 import (
@@ -30,13 +31,13 @@ func main() {
 	}
 
 	// Initialize logger
-	if err := logger.Init(cfg.Logging.Level, cfg.Logging.File); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+	if logErr := logger.Init(cfg.Logging.Level, cfg.Logging.File); logErr != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", logErr)
 		os.Exit(1)
 	}
 	defer func() {
-		if err := logger.Sync(); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to sync logger: %v\n", err)
+		if syncErr := logger.Sync(); syncErr != nil {
+			fmt.Fprintf(os.Stderr, "Failed to sync logger: %v\n", syncErr)
 		}
 	}()
 

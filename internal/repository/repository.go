@@ -1,3 +1,4 @@
+// Package repository provides database operations for the webhook ingestion service.
 package repository
 
 import (
@@ -13,16 +14,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type ctxKey string
+
+const txKey ctxKey = "tx"
+
+// Repository handles all database operations for the webhook ingestion service.
 type Repository struct {
 	db *pgxpool.Pool
 }
 
+// New creates a new Repository instance with the provided database connection pool.
 func New(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
 // WebhookEvent methods
 
+// CreateWebhookEvent inserts a new webhook event into the database.
 func (r *Repository) CreateWebhookEvent(ctx context.Context, event *models.WebhookEvent) error {
 	query := `
 		INSERT INTO webhook_ingestion.webhook_events
@@ -36,6 +44,7 @@ func (r *Repository) CreateWebhookEvent(ctx context.Context, event *models.Webho
 	return err
 }
 
+// UpdateWebhookEventStatus updates the processing status of a webhook event.
 func (r *Repository) UpdateWebhookEventStatus(ctx context.Context, id uuid.UUID, status models.ProcessingStatus, errorMsg *string) error {
 	now := time.Now()
 	query := `
@@ -48,6 +57,7 @@ func (r *Repository) UpdateWebhookEventStatus(ctx context.Context, id uuid.UUID,
 	return err
 }
 
+// GetWebhookEventByID retrieves a webhook event by its ID.
 func (r *Repository) GetWebhookEventByID(ctx context.Context, id uuid.UUID) (*models.WebhookEvent, error) {
 	query := `
 		SELECT id, video_id, channel_id, event_type, payload, source_ip, user_agent,
@@ -70,6 +80,7 @@ func (r *Repository) GetWebhookEventByID(ctx context.Context, id uuid.UUID) (*mo
 
 // Event methods (immutable audit trail)
 
+// CreateEvent inserts a new event into the immutable audit trail.
 func (r *Repository) CreateEvent(ctx context.Context, event *models.Event) error {
 	query := `
 		INSERT INTO webhook_ingestion.events
@@ -83,6 +94,7 @@ func (r *Repository) CreateEvent(ctx context.Context, event *models.Event) error
 	return err
 }
 
+// EventExistsByHash checks if an event with the given hash already exists.
 func (r *Repository) EventExistsByHash(ctx context.Context, hash string) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM webhook_ingestion.events WHERE event_hash = $1)`
 	var exists bool
@@ -90,6 +102,7 @@ func (r *Repository) EventExistsByHash(ctx context.Context, hash string) (bool, 
 	return exists, err
 }
 
+// GetEventsByChannelID retrieves events for a specific channel ID with a limit.
 func (r *Repository) GetEventsByChannelID(ctx context.Context, channelID string, limit int) ([]models.Event, error) {
 	query := `
 		SELECT id, event_type, channel_id, video_id, raw_xml, event_hash, received_at, created_at
@@ -120,6 +133,7 @@ func (r *Repository) GetEventsByChannelID(ctx context.Context, channelID string,
 
 // Subscription methods
 
+// CreateSubscription inserts a new subscription into the database.
 func (r *Repository) CreateSubscription(ctx context.Context, sub *models.Subscription) error {
 	query := `
 		INSERT INTO webhook_ingestion.subscriptions
@@ -133,6 +147,7 @@ func (r *Repository) CreateSubscription(ctx context.Context, sub *models.Subscri
 	return err
 }
 
+// GetSubscriptionByChannelID retrieves a subscription for a specific channel ID.
 func (r *Repository) GetSubscriptionByChannelID(ctx context.Context, channelID string) (*models.Subscription, error) {
 	query := `
 		SELECT id, channel_id, topic_url, callback_url, subscription_status, lease_seconds,
@@ -170,6 +185,7 @@ func (r *Repository) GetSubscriptionByChannelID(ctx context.Context, channelID s
 	return &sub, nil
 }
 
+// UpdateSubscriptionStatus updates the status of a subscription.
 func (r *Repository) UpdateSubscriptionStatus(ctx context.Context, id uuid.UUID, status models.SubscriptionStatus) error {
 	query := `
 		UPDATE webhook_ingestion.subscriptions
@@ -182,35 +198,40 @@ func (r *Repository) UpdateSubscriptionStatus(ctx context.Context, id uuid.UUID,
 
 // Utility functions
 
+// ComputeEventHash computes a SHA-256 hash of the raw XML content for deduplication.
 func ComputeEventHash(rawXML string) string {
 	hash := sha256.Sum256([]byte(rawXML))
 	return hex.EncodeToString(hash[:])
 }
 
-// Health check
+// Ping checks the database connection health.
 func (r *Repository) Ping(ctx context.Context) error {
 	return r.db.Ping(ctx)
 }
 
 // Transaction support
+
+// BeginTx starts a new database transaction and returns a context with the transaction.
 func (r *Repository) BeginTx(ctx context.Context) (context.Context, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return context.WithValue(ctx, "tx", tx), nil
+	return context.WithValue(ctx, txKey, tx), nil
 }
 
+// CommitTx commits the transaction stored in the context.
 func (r *Repository) CommitTx(ctx context.Context) error {
-	tx, ok := ctx.Value("tx").(interface{ Commit(context.Context) error })
+	tx, ok := ctx.Value(txKey).(interface{ Commit(context.Context) error })
 	if !ok {
 		return fmt.Errorf("no transaction in context")
 	}
 	return tx.Commit(ctx)
 }
 
+// RollbackTx rolls back the transaction stored in the context.
 func (r *Repository) RollbackTx(ctx context.Context) error {
-	tx, ok := ctx.Value("tx").(interface{ Rollback(context.Context) error })
+	tx, ok := ctx.Value(txKey).(interface{ Rollback(context.Context) error })
 	if !ok {
 		return fmt.Errorf("no transaction in context")
 	}
