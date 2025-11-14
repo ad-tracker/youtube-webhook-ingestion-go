@@ -1,0 +1,183 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  test:
+    name: Test and Coverage
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: adtracker_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      rabbitmq:
+        image: rabbitmq:3.13-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5672:5672
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests with coverage
+        env:
+          APP_DATABASE_HOST: localhost
+          APP_DATABASE_PORT: 5432
+          APP_DATABASE_NAME: adtracker_test
+          APP_DATABASE_USER: test_user
+          APP_DATABASE_PASSWORD: test_password
+          APP_RABBITMQ_HOST: localhost
+          APP_RABBITMQ_PORT: 5672
+          APP_RABBITMQ_USER: guest
+          APP_RABBITMQ_PASSWORD: guest
+        run: go test ./... -v -race -coverprofile=coverage.txt -covermode=atomic
+
+      - name: Generate coverage report
+        run: go tool cover -html=coverage.txt -o coverage.html
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            coverage.txt
+            coverage.html
+          retention-days: 7
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage.txt
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Check test coverage
+        run: |
+          go tool cover -func=coverage.txt > coverage-summary.txt
+          cat coverage-summary.txt
+          TOTAL_COVERAGE=$(go tool cover -func=coverage.txt | grep total | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Total coverage: $TOTAL_COVERAGE%"
+          if (( $(echo "$TOTAL_COVERAGE < 80.0" | bc -l) )); then
+            echo "❌ Coverage is below 80% threshold"
+            exit 1
+          fi
+          echo "✅ Coverage meets 80% threshold"
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const coverage = fs.readFileSync('coverage-summary.txt', 'utf8');
+            const totalLine = coverage.split('\n').find(line => line.includes('total:'));
+            const totalCoverage = totalLine ? totalLine.match(/\d+\.\d+%/)[0] : 'N/A';
+
+            const comment = `## 📊 Test Coverage Report
+
+            **Total Coverage:** ${totalCoverage}
+
+            <details>
+            <summary>Coverage Details</summary>
+
+            \`\`\`
+            ${coverage}
+            \`\`\`
+
+            </details>
+
+            ${parseFloat(totalCoverage) >= 80 ? '✅ Coverage meets 80% threshold' : '❌ Coverage is below 80% threshold'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          args: --timeout=5m
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Build application
+        run: go build -v -o server ./cmd/server
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-binary
+          path: server
+          retention-days: 7
