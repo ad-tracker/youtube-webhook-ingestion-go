@@ -70,7 +70,11 @@ func main() {
 	if err != nil {
 		logger.Log.Fatal("Failed to initialize RabbitMQ publisher", zap.Error(err))
 	}
-	defer publisher.Close()
+	defer func() {
+		if err := publisher.Close(); err != nil {
+			logger.Log.Error("Failed to close publisher", zap.Error(err))
+		}
+	}()
 
 	// Initialize validator
 	validator := validation.New(cfg.Webhook.MaxPayloadSize, cfg.Webhook.ValidationEnabled)

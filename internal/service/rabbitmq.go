@@ -47,14 +47,14 @@ func (mp *MessagePublisher) connect() error {
 
 	ch, err := conn.Channel()
 	if err != nil {
-		_ = conn.Close()
+		_ = conn.Close() //nolint:errcheck // Cleanup on error path
 		return fmt.Errorf("failed to open channel: %w", err)
 	}
 
 	// Enable publisher confirms
 	if err := ch.Confirm(false); err != nil {
-		_ = ch.Close()
-		_ = conn.Close()
+		_ = ch.Close()   //nolint:errcheck // Cleanup on error path
+		_ = conn.Close() //nolint:errcheck // Cleanup on error path
 		return fmt.Errorf("failed to enable publisher confirms: %w", err)
 	}
 
@@ -68,8 +68,8 @@ func (mp *MessagePublisher) connect() error {
 		false,              // no-wait
 		nil,                // arguments
 	); err != nil {
-		_ = ch.Close()
-		_ = conn.Close()
+		_ = ch.Close()   //nolint:errcheck // Cleanup on error path
+		_ = conn.Close() //nolint:errcheck // Cleanup on error path
 		return fmt.Errorf("failed to declare exchange: %w", err)
 	}
 
@@ -82,12 +82,12 @@ func (mp *MessagePublisher) connect() error {
 		false,           // no-wait
 		amqp.Table{
 			"x-message-ttl":     86400000, // 24 hours
-			"x-max-length":      100000,   // max 100k messages
+			"x-message-length":      100000,   // max 100k messages
 		},
 	)
 	if err != nil {
-		_ = ch.Close()
-		_ = conn.Close()
+		_ = ch.Close()   //nolint:errcheck // Cleanup on error path
+		_ = conn.Close() //nolint:errcheck // Cleanup on error path
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
 
@@ -99,8 +99,8 @@ func (mp *MessagePublisher) connect() error {
 		false,
 		nil,
 	); err != nil {
-		_ = ch.Close()
-		_ = conn.Close()
+		_ = ch.Close()   //nolint:errcheck // Cleanup on error path
+		_ = conn.Close() //nolint:errcheck // Cleanup on error path
 		return fmt.Errorf("failed to bind queue: %w", err)
 	}
 
