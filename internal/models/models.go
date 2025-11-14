@@ -1,3 +1,4 @@
+// Package models contains the data models and DTOs for the YouTube webhook ingestion service.
 package models
 
 import (
