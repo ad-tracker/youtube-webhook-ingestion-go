@@ -88,8 +88,9 @@ jobs:
 
       - name: Merge coverage reports
         run: |
-          go install github.com/wadey/gocovmerge@latest
-          gocovmerge coverage.txt coverage_integration.txt > coverage_merged.txt
+          # Use a version of gocovmerge compatible with Go 1.23
+          GOBIN=$(pwd) go install github.com/wadey/gocovmerge@v0.0.0-20160331181800-b5bfa59ec0ad
+          ./gocovmerge coverage.txt coverage_integration.txt > coverage_merged.txt
           mv coverage_merged.txt coverage.txt
 
       - name: Generate coverage report
