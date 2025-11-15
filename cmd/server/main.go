@@ -51,6 +51,7 @@ func main() {
 	videoRepo := repository.NewVideoRepository(pool)
 	channelRepo := repository.NewChannelRepository(pool)
 	videoUpdateRepo := repository.NewVideoUpdateRepository(pool)
+	subscriptionRepo := repository.NewSubscriptionRepository(pool)
 
 	// Initialize event processor
 	processor := service.NewEventProcessor(
@@ -61,12 +62,21 @@ func main() {
 		videoUpdateRepo,
 	)
 
-	// Initialize webhook handler
+	// Initialize PubSubHub service
+	pubSubHubService := service.NewPubSubHubService(&http.Client{}, logger)
+
+	// Initialize handlers
 	webhookHandler := handler.NewWebhookHandler(processor, config.WebhookSecret, logger)
+	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionRepo, pubSubHubService, logger)
+	getSubscriptionHandler := handler.NewGetSubscriptionHandler(subscriptionRepo, logger)
 
 	// Set up HTTP server
 	mux := http.NewServeMux()
 	mux.Handle(config.WebhookPath, webhookHandler)
+	mux.Handle("/api/v1/subscriptions", methodRouter(map[string]http.Handler{
+		http.MethodPost: subscriptionHandler,
+		http.MethodGet:  getSubscriptionHandler,
+	}))
 	mux.HandleFunc("/health", handleHealth(pool))
 
 	server := &http.Server{
@@ -232,3 +242,15 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 
 // Ensure responseWriter implements http.ResponseWriter
 var _ http.ResponseWriter = (*responseWriter)(nil)
+
+// methodRouter routes requests to different handlers based on HTTP method.
+func methodRouter(handlers map[string]http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler, ok := handlers[r.Method]
+		if !ok {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
+}
