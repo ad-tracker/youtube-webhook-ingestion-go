@@ -10,10 +10,10 @@ import (
 
 func TestLoad(t *testing.T) {
 	tests := []struct {
-		name    string
 		setup   func()
 		cleanup func()
 		check   func(*testing.T, *Config)
+		name    string
 		wantErr bool
 	}{
 		{

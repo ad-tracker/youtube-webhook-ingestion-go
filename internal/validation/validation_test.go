@@ -46,9 +46,9 @@ func TestValidator_ValidatePayload(t *testing.T) {
 	now := time.Now().Unix()
 
 	tests := []struct {
+		payload *models.WebhookPayloadDTO
 		name    string
 		errMsg  string
-		payload *models.WebhookPayloadDTO
 		enabled bool
 		wantErr bool
 	}{

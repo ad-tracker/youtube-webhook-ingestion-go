@@ -129,7 +129,7 @@ func TestWebhookHandler_HandleYouTubeWebhook_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestWebhookHandler_HandleYouTubeWebhook_WithValidationError(t *testing.T) {
+func TestWebhookHandler_HandleYouTubeWebhook_WithValidationError(_ *testing.T) {
 	// Create a minimal mock that returns a validation error
 	// We can't easily mock the service without interfaces, so we test the error path via invalid JSON
 	handler := NewWebhookHandler(nil)

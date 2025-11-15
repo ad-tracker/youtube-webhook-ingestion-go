@@ -12,11 +12,11 @@ import (
 //
 //nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
 	RabbitMQ RabbitMQConfig
-	Webhook  WebhookConfig
 	Logging  LoggingConfig
+	Database DatabaseConfig
+	Server   ServerConfig
+	Webhook  WebhookConfig
 }
 
 // ServerConfig contains HTTP server configuration.
@@ -30,10 +30,10 @@ type ServerConfig struct {
 //nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type DatabaseConfig struct {
 	Host           string
-	Port           int
 	Name           string
 	User           string
 	Password       string
+	Port           int
 	MaxConnections int
 	MinConnections int
 	MaxIdleTime    time.Duration
@@ -45,12 +45,12 @@ type DatabaseConfig struct {
 //nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type RabbitMQConfig struct {
 	Host       string
-	Port       int
 	User       string
 	Password   string
 	Exchange   string
 	Queue      string
 	RoutingKey string
+	Port       int
 }
 
 // WebhookConfig contains webhook processing configuration.
