@@ -121,7 +121,28 @@ jobs:
             const fs = require('fs');
             const coverage = fs.readFileSync('coverage-summary.txt', 'utf8');
             const totalLine = coverage.split('\n').find(line => line.includes('total:'));
-            const totalCoverage = totalLine ? totalLine.match(/\d+\.\d+%/)[0] : 'N/A';
+            let totalCoverage = 'N/A';
+
+            if (totalLine) {
+              const match = totalLine.match(/\d+\.\d+%/);
+              if (match) {
+                totalCoverage = match[0];
+              }
+            }
+
+            let statusMessage = '';
+            if (totalCoverage !== 'N/A') {
+              const coverageValue = parseFloat(totalCoverage);
+              if (coverageValue === 0.0) {
+                statusMessage = '⚠️  No tests found - coverage check skipped';
+              } else if (coverageValue >= 80) {
+                statusMessage = '✅ Coverage meets 80% threshold';
+              } else {
+                statusMessage = '❌ Coverage is below 80% threshold';
+              }
+            } else {
+              statusMessage = '⚠️  Could not parse coverage data';
+            }
 
             const comment = `## 📊 Test Coverage Report
 
@@ -136,7 +157,7 @@ jobs:
 
             </details>
 
-            ${parseFloat(totalCoverage) >= 80 ? '✅ Coverage meets 80% threshold' : '❌ Coverage is below 80% threshold'}
+            ${statusMessage}
             `;
 
             github.rest.issues.createComment({
