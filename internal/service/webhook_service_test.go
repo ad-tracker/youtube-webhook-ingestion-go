@@ -24,9 +24,9 @@ func TestValidationError(t *testing.T) {
 
 func TestProcessingError(t *testing.T) {
 	tests := []struct {
-		name    string
-		err     *ProcessingError
-		want    string
+		name string
+		err  *ProcessingError
+		want string
 	}{
 		{
 			name: "without cause",

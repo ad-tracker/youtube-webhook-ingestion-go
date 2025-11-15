@@ -89,6 +89,7 @@ jobs:
       - name: Merge coverage reports
         run: |
           # Use a version of gocovmerge compatible with Go 1.23
+          export GOTOOLCHAIN=go1.23.12
           GOBIN=$(pwd) go install github.com/wadey/gocovmerge@v0.0.0-20160331181800-b5bfa59ec0ad
           ./gocovmerge coverage.txt coverage_integration.txt > coverage_merged.txt
           mv coverage_merged.txt coverage.txt

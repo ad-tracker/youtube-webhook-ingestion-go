@@ -13,8 +13,8 @@ func TestLoad(t *testing.T) {
 		name    string
 		setup   func()
 		cleanup func()
-		wantErr bool
 		check   func(*testing.T, *Config)
+		wantErr bool
 	}{
 		{
 			name: "load with defaults (no config file)",
@@ -125,26 +125,26 @@ func TestSetDefaults(t *testing.T) {
 
 	tests := []struct {
 		name string
-		key  string
 		want interface{}
+		key  string
 	}{
-		{"server port", "server.port", 8080},
-		{"database host", "database.host", "localhost"},
-		{"database port", "database.port", 5432},
-		{"database name", "database.name", "adtracker"},
-		{"database user", "database.user", "postgres"},
-		{"database maxconnections", "database.maxconnections", 10},
-		{"database minconnections", "database.minconnections", 5},
-		{"rabbitmq host", "rabbitmq.host", "localhost"},
-		{"rabbitmq port", "rabbitmq.port", 5672},
-		{"rabbitmq user", "rabbitmq.user", "guest"},
-		{"rabbitmq exchange", "rabbitmq.exchange", "youtube.webhooks"},
-		{"rabbitmq queue", "rabbitmq.queue", "youtube.webhooks.raw"},
-		{"rabbitmq routingkey", "rabbitmq.routingkey", "webhook.received"},
-		{"webhook maxpayloadsize", "webhook.maxpayloadsize", 1048576},
-		{"webhook validationenabled", "webhook.validationenabled", true},
-		{"logging level", "logging.level", "info"},
-		{"logging file", "logging.file", ""},
+		{"server port", 8080, "server.port"},
+		{"database host", "localhost", "database.host"},
+		{"database port", 5432, "database.port"},
+		{"database name", "adtracker", "database.name"},
+		{"database user", "postgres", "database.user"},
+		{"database maxconnections", 10, "database.maxconnections"},
+		{"database minconnections", 5, "database.minconnections"},
+		{"rabbitmq host", "localhost", "rabbitmq.host"},
+		{"rabbitmq port", 5672, "rabbitmq.port"},
+		{"rabbitmq user", "guest", "rabbitmq.user"},
+		{"rabbitmq exchange", "youtube.webhooks", "rabbitmq.exchange"},
+		{"rabbitmq queue", "youtube.webhooks.raw", "rabbitmq.queue"},
+		{"rabbitmq routingkey", "webhook.received", "rabbitmq.routingkey"},
+		{"webhook maxpayloadsize", 1048576, "webhook.maxpayloadsize"},
+		{"webhook validationenabled", true, "webhook.validationenabled"},
+		{"logging level", "info", "logging.level"},
+		{"logging file", "", "logging.file"},
 	}
 
 	for _, tt := range tests {

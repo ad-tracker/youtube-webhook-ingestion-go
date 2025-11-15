@@ -199,7 +199,7 @@ func TestRepository_UpdateWebhookEventStatus(t *testing.T) {
 	// Update status
 	errorMsg := "test error"
 	err = repo.UpdateWebhookEventStatus(ctx, eventID, models.ProcessingStatusFailed, &errorMsg)
-	if err != nil{
+	if err != nil {
 		t.Fatalf("UpdateWebhookEventStatus() error = %v", err)
 	}
 

@@ -47,10 +47,10 @@ func TestValidator_ValidatePayload(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		enabled bool
-		payload *models.WebhookPayloadDTO
-		wantErr bool
 		errMsg  string
+		payload *models.WebhookPayloadDTO
+		enabled bool
+		wantErr bool
 	}{
 		{
 			name:    "valid payload",
@@ -174,10 +174,8 @@ func TestValidator_ValidatePayload(t *testing.T) {
 				if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
 					t.Errorf("ValidatePayload() error = %v, want error containing %q", err, tt.errMsg)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("ValidatePayload() unexpected error = %v", err)
-				}
+			} else if err != nil {
+				t.Errorf("ValidatePayload() unexpected error = %v", err)
 			}
 		})
 	}
