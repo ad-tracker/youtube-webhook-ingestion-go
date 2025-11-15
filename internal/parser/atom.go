@@ -9,19 +9,19 @@ import (
 // AtomFeed represents a YouTube Atom feed notification.
 // YouTube uses the Atom 1.0 format with custom YouTube namespaces.
 type AtomFeed struct {
-	XMLName xml.Name    `xml:"http://www.w3.org/2005/Atom feed"`
-	Entry   *AtomEntry  `xml:"entry"`
+	XMLName xml.Name      `xml:"http://www.w3.org/2005/Atom feed"`
+	Entry   *AtomEntry    `xml:"entry"`
 	Deleted *DeletedEntry `xml:"http://www.youtube.com/xml/schemas/2015 deleted-entry"`
 }
 
 // AtomEntry represents a video entry in the Atom feed.
 type AtomEntry struct {
-	VideoID     string    `xml:"http://www.youtube.com/xml/schemas/2015 videoId"`
-	ChannelID   string    `xml:"http://www.youtube.com/xml/schemas/2015 channelId"`
-	Title       string    `xml:"title"`
-	Link        AtomLink  `xml:"link"`
-	Published   time.Time `xml:"published"`
-	Updated     time.Time `xml:"updated"`
+	VideoID   string    `xml:"http://www.youtube.com/xml/schemas/2015 videoId"`
+	ChannelID string    `xml:"http://www.youtube.com/xml/schemas/2015 channelId"`
+	Title     string    `xml:"title"`
+	Link      AtomLink  `xml:"link"`
+	Published time.Time `xml:"published"`
+	Updated   time.Time `xml:"updated"`
 }
 
 // AtomLink represents a link element in the Atom feed.
@@ -32,19 +32,19 @@ type AtomLink struct {
 
 // DeletedEntry represents a deleted video notification.
 type DeletedEntry struct {
-	Ref     string    `xml:"ref,attr"`
-	When    time.Time `xml:"when,attr"`
+	Ref  string    `xml:"ref,attr"`
+	When time.Time `xml:"when,attr"`
 }
 
 // VideoData contains the parsed video information from an Atom feed.
 type VideoData struct {
-	VideoID       string
-	ChannelID     string
-	Title         string
-	VideoURL      string
-	PublishedAt   time.Time
-	UpdatedAt     time.Time
-	IsDeleted     bool
+	VideoID     string
+	ChannelID   string
+	Title       string
+	VideoURL    string
+	PublishedAt time.Time
+	UpdatedAt   time.Time
+	IsDeleted   bool
 }
 
 // ParseAtomFeed parses a YouTube Atom feed XML and extracts video information.

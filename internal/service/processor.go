@@ -20,11 +20,11 @@ type EventProcessor interface {
 }
 
 type eventProcessor struct {
-	pool               *pgxpool.Pool
-	webhookEventRepo   repository.WebhookEventRepository
-	videoRepo          repository.VideoRepository
-	channelRepo        repository.ChannelRepository
-	videoUpdateRepo    repository.VideoUpdateRepository
+	pool             *pgxpool.Pool
+	webhookEventRepo repository.WebhookEventRepository
+	videoRepo        repository.VideoRepository
+	channelRepo      repository.ChannelRepository
+	videoUpdateRepo  repository.VideoUpdateRepository
 }
 
 // NewEventProcessor creates a new EventProcessor with the given repositories.

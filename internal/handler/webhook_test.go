@@ -260,9 +260,9 @@ func TestWebhookHandler_VerifySignature(t *testing.T) {
 		wantErr   bool
 	}{
 		{
-			name:      "valid signature",
-			secret:    "my-secret",
-			body:      "test body content",
+			name:   "valid signature",
+			secret: "my-secret",
+			body:   "test body content",
 			signature: func() string {
 				mac := hmac.New(sha1.New, []byte("my-secret"))
 				mac.Write([]byte("test body content"))

@@ -133,7 +133,6 @@ func (m *mockVideoUpdateRepo) GetRecentUpdates(ctx context.Context, limit int) (
 	return args.Get(0).([]*models.VideoUpdate), args.Error(1)
 }
 
-
 func TestEventProcessor_ProcessEvent_InvalidXML(t *testing.T) {
 	t.Parallel()
 
