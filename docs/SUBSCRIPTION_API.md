@@ -6,6 +6,33 @@ This document describes the API endpoint for managing YouTube PubSubHubbub subsc
 
 The subscription API allows you to create and manage subscriptions to YouTube channels via Google's PubSubHubbub (PubSub) infrastructure. When you subscribe to a channel, YouTube will send real-time notifications to your callback URL whenever new videos are published or existing videos are updated.
 
+## Authentication
+
+All subscription endpoints require API key authentication. The API key must be provided in one of the following ways:
+
+1. **X-API-Key header** (recommended):
+   ```
+   X-API-Key: your-api-key-here
+   ```
+
+2. **Authorization Bearer header**:
+   ```
+   Authorization: Bearer your-api-key-here
+   ```
+
+The API key is configured via the `API_KEYS` environment variable (comma-separated for multiple keys).
+
+### Unauthorized Response
+
+If the API key is missing or invalid, the endpoint returns:
+
+**401 Unauthorized**
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
 ## Endpoints
 
 ### Create Subscription
@@ -13,6 +40,8 @@ The subscription API allows you to create and manage subscriptions to YouTube ch
 **POST** `/api/v1/subscriptions`
 
 Creates a new PubSubHubbub subscription for a YouTube channel.
+
+**Authentication:** Required
 
 #### Request Body
 
@@ -85,6 +114,8 @@ Creates a new PubSubHubbub subscription for a YouTube channel.
 
 Retrieves all subscriptions for a specific channel.
 
+**Authentication:** Required
+
 #### Query Parameters
 
 - `channel_id` (string, required): YouTube channel ID
@@ -150,6 +181,7 @@ Subscriptions can have the following statuses:
 ```bash
 curl -X POST http://localhost:8080/api/v1/subscriptions \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
   -d '{
     "channel_id": "UCxxxxxxxxxxxxxxxxxxxxxx",
     "callback_url": "https://yourdomain.com/webhook",
@@ -161,7 +193,8 @@ curl -X POST http://localhost:8080/api/v1/subscriptions \
 ### Get Subscriptions (curl)
 
 ```bash
-curl -X GET "http://localhost:8080/api/v1/subscriptions?channel_id=UCxxxxxxxxxxxxxxxxxxxxxx"
+curl -X GET "http://localhost:8080/api/v1/subscriptions?channel_id=UCxxxxxxxxxxxxxxxxxxxxxx" \
+  -H "X-API-Key: your-api-key-here"
 ```
 
 ### Create a Subscription (Go)
@@ -193,11 +226,16 @@ func main() {
     }
 
     body, _ := json.Marshal(req)
-    resp, err := http.Post(
+
+    httpReq, _ := http.NewRequest(
+        "POST",
         "http://localhost:8080/api/v1/subscriptions",
-        "application/json",
         bytes.NewReader(body),
     )
+    httpReq.Header.Set("Content-Type", "application/json")
+    httpReq.Header.Set("X-API-Key", "your-api-key-here")
+
+    resp, err := http.DefaultClient.Do(httpReq)
     if err != nil {
         panic(err)
     }
@@ -236,14 +274,36 @@ CREATE TABLE pubsub_subscriptions (
 );
 ```
 
+## Environment Configuration
+
+The server requires the following environment variables:
+
+- `DATABASE_URL` (required): PostgreSQL connection string
+- `API_KEYS` (required for subscription endpoints): Comma-separated list of valid API keys
+  - Example: `API_KEYS="key1,key2,key3"`
+  - If not set, all subscription endpoint requests will be rejected with 401 Unauthorized
+- `PORT` (optional): Server port (default: 8080)
+- `WEBHOOK_PATH` (optional): Path for webhook endpoint (default: /webhook)
+- `WEBHOOK_SECRET` (optional): Secret for webhook HMAC verification
+
+Example:
+```bash
+export DATABASE_URL="postgres://user:password@localhost:5432/youtube_webhooks?sslmode=disable"
+export API_KEYS="sk_live_abc123,sk_test_def456"
+export PORT="8080"
+./server
+```
+
 ## Best Practices
 
-1. **Use HTTPS for callback URLs**: YouTube requires HTTPS for production webhooks
-2. **Implement webhook verification**: Use the `secret` parameter to verify incoming webhooks
-3. **Monitor subscription status**: Regularly check for expired subscriptions
-4. **Renew before expiration**: Renew subscriptions before they expire to avoid gaps
-5. **Handle duplicate subscriptions**: The API prevents duplicate subscriptions automatically
-6. **Implement proper error handling**: Handle various error scenarios gracefully
+1. **Secure your API keys**: Store API keys securely and never commit them to version control
+2. **Use HTTPS for callback URLs**: YouTube requires HTTPS for production webhooks
+3. **Implement webhook verification**: Use the `secret` parameter to verify incoming webhooks
+4. **Monitor subscription status**: Regularly check for expired subscriptions
+5. **Renew before expiration**: Renew subscriptions before they expire to avoid gaps
+6. **Handle duplicate subscriptions**: The API prevents duplicate subscriptions automatically
+7. **Implement proper error handling**: Handle various error scenarios gracefully
+8. **Rotate API keys regularly**: For security, rotate your API keys periodically
 
 ## Notes
 
