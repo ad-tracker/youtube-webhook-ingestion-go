@@ -1,0 +1,234 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"ad-tracker/youtube-webhook-ingestion/internal/db/repository"
+	"ad-tracker/youtube-webhook-ingestion/internal/handler"
+	"ad-tracker/youtube-webhook-ingestion/internal/service"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+const (
+	defaultPort        = "8080"
+	defaultWebhookPath = "/webhook"
+	shutdownTimeout    = 30 * time.Second
+)
+
+func main() {
+	// Initialize structured logger
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
+	// Load configuration from environment
+	config := loadConfig()
+
+	// Initialize database connection
+	ctx := context.Background()
+	pool, err := initDatabase(ctx, config.DatabaseURL)
+	if err != nil {
+		logger.Error("failed to initialize database", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	logger.Info("database connection established",
+		"max_conns", pool.Config().MaxConns,
+	)
+
+	// Initialize repositories
+	webhookEventRepo := repository.NewWebhookEventRepository(pool)
+	videoRepo := repository.NewVideoRepository(pool)
+	channelRepo := repository.NewChannelRepository(pool)
+	videoUpdateRepo := repository.NewVideoUpdateRepository(pool)
+
+	// Initialize event processor
+	processor := service.NewEventProcessor(
+		pool,
+		webhookEventRepo,
+		videoRepo,
+		channelRepo,
+		videoUpdateRepo,
+	)
+
+	// Initialize webhook handler
+	webhookHandler := handler.NewWebhookHandler(processor, config.WebhookSecret, logger)
+
+	// Set up HTTP server
+	mux := http.NewServeMux()
+	mux.Handle(config.WebhookPath, webhookHandler)
+	mux.HandleFunc("/health", handleHealth(pool))
+
+	server := &http.Server{
+		Addr:         ":" + config.Port,
+		Handler:      loggingMiddleware(logger)(mux),
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Start server in a goroutine
+	serverErrors := make(chan error, 1)
+	go func() {
+		logger.Info("server starting",
+			"port", config.Port,
+			"webhook_path", config.WebhookPath,
+		)
+		serverErrors <- server.ListenAndServe()
+	}()
+
+	// Wait for interrupt signal or server error
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErrors:
+		logger.Error("server error", "error", err)
+		os.Exit(1)
+	case sig := <-shutdown:
+		logger.Info("shutdown signal received", "signal", sig)
+
+		// Give outstanding requests time to complete
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			logger.Error("graceful shutdown failed", "error", err)
+			if err := server.Close(); err != nil {
+				logger.Error("failed to close server", "error", err)
+			}
+			os.Exit(1)
+		}
+
+		logger.Info("server stopped gracefully")
+	}
+}
+
+// Config holds application configuration.
+type Config struct {
+	Port          string
+	DatabaseURL   string
+	WebhookSecret string
+	WebhookPath   string
+}
+
+// loadConfig loads configuration from environment variables.
+func loadConfig() *Config {
+	config := &Config{
+		Port:          getEnv("PORT", defaultPort),
+		DatabaseURL:   getEnv("DATABASE_URL", ""),
+		WebhookSecret: getEnv("WEBHOOK_SECRET", ""),
+		WebhookPath:   getEnv("WEBHOOK_PATH", defaultWebhookPath),
+	}
+
+	if config.DatabaseURL == "" {
+		slog.Error("DATABASE_URL environment variable is required")
+		os.Exit(1)
+	}
+
+	return config
+}
+
+// getEnv gets an environment variable or returns a default value.
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// initDatabase initializes the database connection pool.
+func initDatabase(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
+	poolConfig, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse database URL: %w", err)
+	}
+
+	// Configure connection pool
+	poolConfig.MaxConns = 25
+	poolConfig.MinConns = 5
+	poolConfig.MaxConnLifetime = time.Hour
+	poolConfig.MaxConnIdleTime = 30 * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		return nil, fmt.Errorf("create connection pool: %w", err)
+	}
+
+	// Verify connection
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+
+	return pool, nil
+}
+
+// handleHealth returns a health check handler that verifies database connectivity.
+func handleHealth(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		// Check database connectivity
+		if err := pool.Ping(ctx); err != nil {
+			slog.Error("health check failed", "error", err)
+			http.Error(w, "Database unhealthy", http.StatusServiceUnavailable)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"healthy","database":"connected"}`))
+	}
+}
+
+// loggingMiddleware logs HTTP requests.
+func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+
+			// Wrap response writer to capture status code
+			rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
+			next.ServeHTTP(rw, r)
+
+			logger.Info("request completed",
+				"method", r.Method,
+				"path", r.URL.Path,
+				"status", rw.statusCode,
+				"duration_ms", time.Since(start).Milliseconds(),
+				"remote_addr", r.RemoteAddr,
+			)
+		})
+	}
+}
+
+// responseWriter wraps http.ResponseWriter to capture the status code.
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *responseWriter) Write(b []byte) (int, error) {
+	return rw.ResponseWriter.Write(b)
+}
+
+// Ensure responseWriter implements http.ResponseWriter
+var _ http.ResponseWriter = (*responseWriter)(nil)
