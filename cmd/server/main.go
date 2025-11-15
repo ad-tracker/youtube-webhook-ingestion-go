@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"ad-tracker/youtube-webhook-ingestion/internal/db/repository"
 	"ad-tracker/youtube-webhook-ingestion/internal/handler"
+	"ad-tracker/youtube-webhook-ingestion/internal/middleware"
 	"ad-tracker/youtube-webhook-ingestion/internal/service"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -70,13 +72,17 @@ func main() {
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionRepo, pubSubHubService, logger)
 	getSubscriptionHandler := handler.NewGetSubscriptionHandler(subscriptionRepo, logger)
 
+	// Initialize authentication middleware
+	authMiddleware := middleware.NewAPIKeyAuth(config.APIKeys, logger)
+
 	// Set up HTTP server
 	mux := http.NewServeMux()
 	mux.Handle(config.WebhookPath, webhookHandler)
-	mux.Handle("/api/v1/subscriptions", methodRouter(map[string]http.Handler{
+	// Apply authentication middleware only to subscription endpoints
+	mux.Handle("/api/v1/subscriptions", authMiddleware.Middleware(methodRouter(map[string]http.Handler{
 		http.MethodPost: subscriptionHandler,
 		http.MethodGet:  getSubscriptionHandler,
-	}))
+	})))
 	mux.HandleFunc("/health", handleHealth(pool))
 
 	server := &http.Server{
@@ -130,6 +136,7 @@ type Config struct {
 	DatabaseURL   string
 	WebhookSecret string
 	WebhookPath   string
+	APIKeys       []string
 }
 
 // loadConfig loads configuration from environment variables.
@@ -139,11 +146,18 @@ func loadConfig() *Config {
 		DatabaseURL:   getEnv("DATABASE_URL", ""),
 		WebhookSecret: getEnv("WEBHOOK_SECRET", ""),
 		WebhookPath:   getEnv("WEBHOOK_PATH", defaultWebhookPath),
+		APIKeys:       parseAPIKeys(getEnv("API_KEYS", "")),
 	}
 
 	if config.DatabaseURL == "" {
 		slog.Error("DATABASE_URL environment variable is required")
 		os.Exit(1)
+	}
+
+	if len(config.APIKeys) == 0 {
+		slog.Warn("no API keys configured - subscription endpoints will reject all requests",
+			"env_var", "API_KEYS",
+		)
 	}
 
 	return config
@@ -155,6 +169,26 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// parseAPIKeys parses a comma-separated list of API keys.
+// Empty strings and whitespace are trimmed from each key.
+func parseAPIKeys(apiKeysEnv string) []string {
+	if apiKeysEnv == "" {
+		return nil
+	}
+
+	parts := strings.Split(apiKeysEnv, ",")
+	keys := make([]string, 0, len(parts))
+
+	for _, key := range parts {
+		trimmed := strings.TrimSpace(key)
+		if trimmed != "" {
+			keys = append(keys, trimmed)
+		}
+	}
+
+	return keys
 }
 
 // initDatabase initializes the database connection pool.
