@@ -60,7 +60,7 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Run tests with coverage
+      - name: Run unit tests with coverage
         env:
           APP_DATABASE_HOST: localhost
           APP_DATABASE_PORT: 5432
@@ -71,7 +71,26 @@ jobs:
           APP_RABBITMQ_PORT: 5672
           APP_RABBITMQ_USER: guest
           APP_RABBITMQ_PASSWORD: guest
-        run: go test ./... -v -race -coverprofile=coverage.txt -covermode=atomic
+        run: go test ./... -v -race -coverprofile=coverage.txt -covermode=atomic -short
+
+      - name: Run integration tests with coverage
+        env:
+          APP_DATABASE_HOST: localhost
+          APP_DATABASE_PORT: 5432
+          APP_DATABASE_NAME: adtracker_test
+          APP_DATABASE_USER: test_user
+          APP_DATABASE_PASSWORD: test_password
+          APP_RABBITMQ_HOST: localhost
+          APP_RABBITMQ_PORT: 5672
+          APP_RABBITMQ_USER: guest
+          APP_RABBITMQ_PASSWORD: guest
+        run: go test ./... -v -tags=integration -coverprofile=coverage_integration.txt -covermode=atomic
+
+      - name: Merge coverage reports
+        run: |
+          go install github.com/wadey/gocovmerge@latest
+          gocovmerge coverage.txt coverage_integration.txt > coverage_merged.txt
+          mv coverage_merged.txt coverage.txt
 
       - name: Generate coverage report
         run: go tool cover -html=coverage.txt -o coverage.html
