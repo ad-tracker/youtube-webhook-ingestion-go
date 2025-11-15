@@ -1,0 +1,35 @@
+# Git
+.git
+.gitignore
+
+# GitHub
+.github
+
+# Documentation
+*.md
+docs/
+
+# Examples
+examples/
+
+# Test files
+*_test.go
+testdata/
+
+# Build artifacts
+bin/
+*.exe
+*.out
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/

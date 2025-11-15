@@ -1,0 +1,75 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.3'
+          cache: true
+
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Go code is not formatted. Please run 'go fmt ./...'"
+            gofmt -d .
+            exit 1
+          fi
+
+      - name: Check dependencies are up to date
+        run: |
+          go mod tidy
+          if [ -n "$(git status --porcelain go.mod go.sum)" ]; then
+            echo "go.mod or go.sum is not up to date. Please run 'go mod tidy'"
+            git diff go.mod go.sum
+            exit 1
+          fi
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: unittests
+          fail_ci_if_error: false
+        continue-on-error: true
+
+      - name: Build
+        run: |
+          # Build the migration tool
+          go build -v -o bin/migrate ./cmd/migrate
+
+          # Verify binaries were created
+          if [ ! -f bin/migrate ]; then
+            echo "Build failed: migrate binary not created"
+            exit 1
+          fi
+
+          echo "Build successful!"
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run staticcheck (if available)
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+        continue-on-error: true
