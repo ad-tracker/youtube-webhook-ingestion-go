@@ -1,3 +1,4 @@
+// Package handler provides HTTP request handlers for the application.
 package handler
 
 import (
@@ -9,11 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// HealthHandler handles health check endpoints.
 type HealthHandler struct {
 	repo      *repository.Repository
 	publisher *service.MessagePublisher
 }
 
+// NewHealthHandler creates a new HealthHandler instance.
 func NewHealthHandler(repo *repository.Repository, publisher *service.MessagePublisher) *HealthHandler {
 	return &HealthHandler{
 		repo:      repo,
@@ -21,7 +24,7 @@ func NewHealthHandler(repo *repository.Repository, publisher *service.MessagePub
 	}
 }
 
-// LivenessProbe checks if the application is running
+// LivenessProbe checks if the application is running.
 func (h *HealthHandler) LivenessProbe(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "UP",
@@ -29,7 +32,7 @@ func (h *HealthHandler) LivenessProbe(c *gin.Context) {
 	})
 }
 
-// ReadinessProbe checks if the application is ready to serve traffic
+// ReadinessProbe checks if the application is ready to serve traffic.
 func (h *HealthHandler) ReadinessProbe(c *gin.Context) {
 	ctx := c.Request.Context()
 

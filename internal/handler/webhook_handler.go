@@ -12,16 +12,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// WebhookHandler handles webhook-related HTTP requests.
 type WebhookHandler struct {
 	webhookService *service.WebhookService
 }
 
+// NewWebhookHandler creates a new WebhookHandler instance.
 func NewWebhookHandler(webhookService *service.WebhookService) *WebhookHandler {
 	return &WebhookHandler{
 		webhookService: webhookService,
 	}
 }
 
+// HandleYouTubeWebhook processes incoming YouTube webhook notifications.
 func (h *WebhookHandler) HandleYouTubeWebhook(c *gin.Context) {
 	var payload models.WebhookPayloadDTO
 
@@ -61,6 +64,7 @@ func (h *WebhookHandler) HandleYouTubeWebhook(c *gin.Context) {
 	c.JSON(http.StatusAccepted, response)
 }
 
+// HealthCheck provides a simple health check endpoint for the webhook handler.
 func (h *WebhookHandler) HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "healthy",

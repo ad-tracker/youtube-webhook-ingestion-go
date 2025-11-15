@@ -1,3 +1,4 @@
+// Package service provides business logic for webhook processing.
 package service
 
 import (
@@ -14,12 +15,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// WebhookService handles webhook processing business logic.
 type WebhookService struct {
 	repo      *repository.Repository
 	publisher *MessagePublisher
 	validator *validation.Validator
 }
 
+// NewWebhookService creates a new WebhookService instance.
 func NewWebhookService(repo *repository.Repository, publisher *MessagePublisher, validator *validation.Validator) *WebhookService {
 	return &WebhookService{
 		repo:      repo,
@@ -28,6 +31,7 @@ func NewWebhookService(repo *repository.Repository, publisher *MessagePublisher,
 	}
 }
 
+// ProcessWebhook processes an incoming webhook event through the full pipeline.
 func (ws *WebhookService) ProcessWebhook(ctx context.Context, payload *models.WebhookPayloadDTO, sourceIP, userAgent string) (*models.WebhookResponseDTO, error) {
 	// Step 1: Validate payload
 	if err := ws.validator.ValidatePayload(payload); err != nil {
@@ -89,16 +93,18 @@ func (ws *WebhookService) ProcessWebhook(ctx context.Context, payload *models.We
 			zap.Error(err),
 			zap.String("eventId", eventID.String()),
 		)
-	} else if exists {
+	}
+	if err == nil && exists {
 		logger.Log.Info("Duplicate event detected (skipping insert)",
 			zap.String("eventHash", event.EventHash),
 			zap.String("channelId", payload.ChannelID),
 		)
-	} else {
+	}
+	if err == nil && !exists {
 		// Insert if not duplicate
-		if err := ws.repo.CreateEvent(ctx, event); err != nil {
+		if createErr := ws.repo.CreateEvent(ctx, event); createErr != nil {
 			logger.Log.Error("Failed to create immutable event",
-				zap.Error(err),
+				zap.Error(createErr),
 				zap.String("eventId", eventID.String()),
 			)
 		} else {
@@ -160,6 +166,8 @@ func (ws *WebhookService) serializePayload(payload *models.WebhookPayloadDTO) st
 }
 
 // Custom errors
+
+// ValidationError represents a webhook payload validation error.
 type ValidationError struct {
 	Message string
 }
@@ -168,6 +176,9 @@ func (e *ValidationError) Error() string {
 	return e.Message
 }
 
+// ProcessingError represents an error that occurred during webhook processing.
+//
+//nolint:govet // fieldalignment: Accept minor memory overhead for better readability
 type ProcessingError struct {
 	Message string
 	Cause   error

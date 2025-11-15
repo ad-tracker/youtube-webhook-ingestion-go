@@ -12,6 +12,7 @@
 # Output of the go coverage tool
 *.out
 coverage.txt
+coverage*.txt
 coverage.html
 
 # Dependency directories
@@ -39,6 +40,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+**/development
 
 # Build directories
 build/

@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// MessagePublisher handles publishing webhook events to RabbitMQ.
 type MessagePublisher struct {
 	conn    *amqp.Connection
 	channel *amqp.Channel
@@ -21,6 +22,7 @@ type MessagePublisher struct {
 	mu      sync.RWMutex
 }
 
+// NewMessagePublisher creates and initializes a new RabbitMQ message publisher.
 func NewMessagePublisher(cfg *config.RabbitMQConfig) (*MessagePublisher, error) {
 	mp := &MessagePublisher{
 		config: cfg,
@@ -52,14 +54,14 @@ func (mp *MessagePublisher) connect() error {
 	}
 
 	// Enable publisher confirms
-	if err := ch.Confirm(false); err != nil {
+	if confirmErr := ch.Confirm(false); confirmErr != nil {
 		_ = ch.Close()   //nolint:errcheck // Cleanup on error path
 		_ = conn.Close() //nolint:errcheck // Cleanup on error path
-		return fmt.Errorf("failed to enable publisher confirms: %w", err)
+		return fmt.Errorf("failed to enable publisher confirms: %w", confirmErr)
 	}
 
 	// Declare exchange
-	if err := ch.ExchangeDeclare(
+	if exchangeErr := ch.ExchangeDeclare(
 		mp.config.Exchange, // name
 		"topic",            // type
 		true,               // durable
@@ -67,10 +69,10 @@ func (mp *MessagePublisher) connect() error {
 		false,              // internal
 		false,              // no-wait
 		nil,                // arguments
-	); err != nil {
+	); exchangeErr != nil {
 		_ = ch.Close()   //nolint:errcheck // Cleanup on error path
 		_ = conn.Close() //nolint:errcheck // Cleanup on error path
-		return fmt.Errorf("failed to declare exchange: %w", err)
+		return fmt.Errorf("failed to declare exchange: %w", exchangeErr)
 	}
 
 	// Declare queue
@@ -81,8 +83,8 @@ func (mp *MessagePublisher) connect() error {
 		false,           // exclusive
 		false,           // no-wait
 		amqp.Table{
-			"x-message-ttl":     86400000, // 24 hours
-			"x-message-length":      100000,   // max 100k messages
+			"x-message-ttl":    86400000, // 24 hours
+			"x-message-length": 100000,   // max 100k messages
 		},
 	)
 	if err != nil {
@@ -92,16 +94,16 @@ func (mp *MessagePublisher) connect() error {
 	}
 
 	// Bind queue to exchange
-	if err := ch.QueueBind(
+	if bindErr := ch.QueueBind(
 		mp.config.Queue,      // queue name
 		mp.config.RoutingKey, // routing key
 		mp.config.Exchange,   // exchange
 		false,
 		nil,
-	); err != nil {
+	); bindErr != nil {
 		_ = ch.Close()   //nolint:errcheck // Cleanup on error path
 		_ = conn.Close() //nolint:errcheck // Cleanup on error path
-		return fmt.Errorf("failed to bind queue: %w", err)
+		return fmt.Errorf("failed to bind queue: %w", bindErr)
 	}
 
 	mp.conn = conn
@@ -115,6 +117,7 @@ func (mp *MessagePublisher) connect() error {
 	return nil
 }
 
+// PublishEvent publishes a webhook event to RabbitMQ with publisher confirms.
 func (mp *MessagePublisher) PublishEvent(ctx context.Context, event *models.WebhookEvent) error {
 	mp.mu.RLock()
 	defer mp.mu.RUnlock()
@@ -170,6 +173,7 @@ func (mp *MessagePublisher) PublishEvent(ctx context.Context, event *models.Webh
 	return nil
 }
 
+// Close closes the RabbitMQ connection and channel.
 func (mp *MessagePublisher) Close() error {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
@@ -194,6 +198,7 @@ func (mp *MessagePublisher) Close() error {
 	return nil
 }
 
+// IsHealthy checks if the RabbitMQ connection is healthy.
 func (mp *MessagePublisher) IsHealthy() bool {
 	mp.mu.RLock()
 	defer mp.mu.RUnlock()

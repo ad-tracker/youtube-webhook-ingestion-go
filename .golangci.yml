@@ -19,7 +19,7 @@ linters:
     - unparam
     - gosec
     - bodyclose
-    - exportloopref
+    - copyloopvar  # Replaced deprecated exportloopref
     - goconst
     - gocritic
     - gocyclo
@@ -34,7 +34,6 @@ linters-settings:
     check-blank: true
 
   govet:
-    check-shadowing: true
     enable-all: true
 
   gocyclo:
@@ -98,6 +97,7 @@ issues:
         - lll
 
 output:
-  format: colored-line-number
+  formats:
+    - format: colored-line-number
   print-issued-lines: true
   print-linter-name: true

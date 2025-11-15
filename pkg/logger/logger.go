@@ -1,3 +1,4 @@
+// Package logger provides structured logging functionality using Zap.
 package logger
 
 import (
@@ -5,8 +6,10 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// Log is the global logger instance used throughout the application.
 var Log *zap.Logger
 
+// Init initializes the global logger with the specified log level and output file.
 func Init(level string, logFile string) error {
 	var config zap.Config
 
@@ -40,6 +43,7 @@ func Init(level string, logFile string) error {
 	return nil
 }
 
+// Sync flushes any buffered log entries.
 func Sync() error {
 	if Log != nil {
 		return Log.Sync()
