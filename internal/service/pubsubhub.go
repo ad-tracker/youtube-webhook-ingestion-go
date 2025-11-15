@@ -62,10 +62,10 @@ type SubscribeRequest struct {
 
 // SubscribeResponse contains the response from the hub.
 type SubscribeResponse struct {
-	Accepted      bool
-	StatusCode    int
-	ResponseBody  string
-	LeaseSeconds  int
+	Accepted     bool
+	StatusCode   int
+	ResponseBody string
+	LeaseSeconds int
 }
 
 // Subscribe sends a subscription request to the PubSubHubbub hub.
