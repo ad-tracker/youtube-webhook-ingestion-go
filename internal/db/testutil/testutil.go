@@ -104,7 +104,7 @@ func (td *TestDatabase) TruncateTables(t *testing.T) {
 
 	// Truncate all tables
 	_, err = td.Pool.Exec(ctx, `
-		TRUNCATE TABLE video_updates, videos, channels, webhook_events RESTART IDENTITY CASCADE;
+		TRUNCATE TABLE video_updates, videos, channels, webhook_events, pubsub_subscriptions RESTART IDENTITY CASCADE;
 	`)
 	require.NoError(t, err)
 
