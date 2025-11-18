@@ -284,11 +284,10 @@ func (h *WebhookEventHandler) handleList(w http.ResponseWriter, r *http.Request)
 	}
 
 	response := map[string]interface{}{
-		"webhook_events": events,
-		"count":          len(events),
-		"total":          total,
-		"limit":          limit,
-		"offset":         offset,
+		"items": events,
+		"total": total,
+		"limit": limit,
+		"offset": offset,
 	}
 
 	sendJSON(w, http.StatusOK, response)
@@ -481,11 +480,10 @@ func (h *ChannelHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]interface{}{
-		"channels": channels,
-		"count":    len(channels),
-		"total":    total,
-		"limit":    limit,
-		"offset":   offset,
+		"items": channels,
+		"total": total,
+		"limit": limit,
+		"offset": offset,
 	}
 
 	sendJSON(w, http.StatusOK, response)

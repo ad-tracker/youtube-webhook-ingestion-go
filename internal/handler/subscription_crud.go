@@ -215,11 +215,10 @@ func (h *SubscriptionCRUDHandler) handleList(w http.ResponseWriter, r *http.Requ
 	}
 
 	response := map[string]interface{}{
-		"subscriptions": subscriptions,
-		"count":         len(subscriptions),
-		"total":         total,
-		"limit":         limit,
-		"offset":        offset,
+		"items":  subscriptions,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
 	}
 
 	sendJSON(w, http.StatusOK, response)

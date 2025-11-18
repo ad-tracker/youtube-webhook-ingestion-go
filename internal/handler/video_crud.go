@@ -196,10 +196,9 @@ func (h *VideoHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]interface{}{
-		"videos": videos,
-		"count":  len(videos),
-		"total":  total,
-		"limit":  limit,
+		"items": videos,
+		"total": total,
+		"limit": limit,
 		"offset": offset,
 	}
 
@@ -465,11 +464,10 @@ func (h *VideoUpdateHandler) handleList(w http.ResponseWriter, r *http.Request) 
 	}
 
 	response := map[string]interface{}{
-		"video_updates": updates,
-		"count":         len(updates),
-		"total":         total,
-		"limit":         limit,
-		"offset":        offset,
+		"items": updates,
+		"total": total,
+		"limit": limit,
+		"offset": offset,
 	}
 
 	sendJSON(w, http.StatusOK, response)
