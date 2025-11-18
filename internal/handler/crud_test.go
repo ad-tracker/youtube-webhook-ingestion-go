@@ -319,9 +319,9 @@ func TestWebhookEventHandler_List(t *testing.T) {
 				t.Fatalf("failed to decode response: %v", err)
 			}
 
-			events := result["webhook_events"].([]interface{})
-			if len(events) != tt.expectedCount {
-				t.Errorf("expected %d events, got %d", tt.expectedCount, len(events))
+			items := result["items"].([]interface{})
+			if len(items) != tt.expectedCount {
+				t.Errorf("expected %d events, got %d", tt.expectedCount, len(items))
 			}
 		})
 	}
