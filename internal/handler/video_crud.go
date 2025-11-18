@@ -196,9 +196,9 @@ func (h *VideoHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]interface{}{
-		"items": videos,
-		"total": total,
-		"limit": limit,
+		"items":  videos,
+		"total":  total,
+		"limit":  limit,
 		"offset": offset,
 	}
 
@@ -464,9 +464,9 @@ func (h *VideoUpdateHandler) handleList(w http.ResponseWriter, r *http.Request) 
 	}
 
 	response := map[string]interface{}{
-		"items": updates,
-		"total": total,
-		"limit": limit,
+		"items":  updates,
+		"total":  total,
+		"limit":  limit,
 		"offset": offset,
 	}
 
