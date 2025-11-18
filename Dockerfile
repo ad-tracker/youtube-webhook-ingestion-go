@@ -25,6 +25,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
     -ldflags="-s -w -X main.version=$(git describe --tags --always --dirty)" \
     -o migrate ./cmd/migrate
 
+# Build the renewal service
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags="-s -w -X main.version=$(git describe --tags --always --dirty)" \
+    -o renewer ./cmd/renewer
+
 # Final stage
 FROM alpine:latest
 
@@ -40,6 +45,7 @@ WORKDIR /app
 # Copy binaries from builder
 COPY --from=builder /build/server /app/server
 COPY --from=builder /build/migrate /app/migrate
+COPY --from=builder /build/renewer /app/renewer
 
 # Copy migrations directory
 COPY --from=builder /build/migrations /app/migrations
@@ -49,6 +55,9 @@ RUN printf '#!/bin/sh\n\
 # Check if first argument is -direction (migrate command)\n\
 if [ "$1" = "-direction" ]; then\n\
   exec /app/migrate "$@"\n\
+# Check if being called as renewer\n\
+elif [ "$(basename "$0")" = "renewer" ] || [ "$1" = "renewer" ]; then\n\
+  exec /app/renewer "$@"\n\
 else\n\
   exec /app/server "$@"\n\
 fi\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
