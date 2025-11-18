@@ -68,6 +68,14 @@ func (m *mockSubscriptionRepository) GetByStatus(ctx context.Context, status str
 	return args.Get(0).([]*models.Subscription), args.Error(1)
 }
 
+func (m *mockSubscriptionRepository) List(ctx context.Context, filters interface{}) ([]*models.Subscription, int, error) {
+	args := m.Called(ctx, filters)
+	if args.Get(0) == nil {
+		return nil, args.Int(1), args.Error(2)
+	}
+	return args.Get(0).([]*models.Subscription), args.Int(1), args.Error(2)
+}
+
 // mockPubSubHub mocks the PubSubHub interface
 type mockPubSubHub struct {
 	mock.Mock
