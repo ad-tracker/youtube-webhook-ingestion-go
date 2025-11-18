@@ -69,20 +69,36 @@ func main() {
 
 	// Initialize handlers
 	webhookHandler := handler.NewWebhookHandler(processor, config.WebhookSecret, logger)
-	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, logger)
-	getSubscriptionHandler := handler.NewGetSubscriptionHandler(subscriptionRepo, logger)
+
+	// CRUD handlers
+	webhookEventHandler := handler.NewWebhookEventHandler(webhookEventRepo, logger)
+	channelHandler := handler.NewChannelHandler(channelRepo, logger)
+	videoHandler := handler.NewVideoHandler(videoRepo, logger)
+	videoUpdateHandler := handler.NewVideoUpdateHandler(videoUpdateRepo, logger)
+	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, logger)
 
 	// Initialize authentication middleware
 	authMiddleware := middleware.NewAPIKeyAuth(config.APIKeys, logger)
 
 	// Set up HTTP server
 	mux := http.NewServeMux()
+
+	// Public webhook endpoint (no authentication)
 	mux.Handle(config.WebhookPath, webhookHandler)
-	// Apply authentication middleware only to subscription endpoints
-	mux.Handle("/api/v1/subscriptions", authMiddleware.Middleware(methodRouter(map[string]http.Handler{
-		http.MethodPost: subscriptionHandler,
-		http.MethodGet:  getSubscriptionHandler,
-	})))
+
+	// Protected CRUD API endpoints (with authentication)
+	mux.Handle("/api/v1/webhook-events", authMiddleware.Middleware(webhookEventHandler))
+	mux.Handle("/api/v1/webhook-events/", authMiddleware.Middleware(webhookEventHandler))
+	mux.Handle("/api/v1/channels", authMiddleware.Middleware(channelHandler))
+	mux.Handle("/api/v1/channels/", authMiddleware.Middleware(channelHandler))
+	mux.Handle("/api/v1/videos", authMiddleware.Middleware(videoHandler))
+	mux.Handle("/api/v1/videos/", authMiddleware.Middleware(videoHandler))
+	mux.Handle("/api/v1/video-updates", authMiddleware.Middleware(videoUpdateHandler))
+	mux.Handle("/api/v1/video-updates/", authMiddleware.Middleware(videoUpdateHandler))
+	mux.Handle("/api/v1/subscriptions", authMiddleware.Middleware(subscriptionCRUDHandler))
+	mux.Handle("/api/v1/subscriptions/", authMiddleware.Middleware(subscriptionCRUDHandler))
+
+	// Health check endpoint (public)
 	mux.HandleFunc("/health", handleHealth(pool))
 
 	server := &http.Server{
@@ -276,15 +292,3 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 
 // Ensure responseWriter implements http.ResponseWriter
 var _ http.ResponseWriter = (*responseWriter)(nil)
-
-// methodRouter routes requests to different handlers based on HTTP method.
-func methodRouter(handlers map[string]http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handler, ok := handlers[r.Method]
-		if !ok {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		handler.ServeHTTP(w, r)
-	})
-}

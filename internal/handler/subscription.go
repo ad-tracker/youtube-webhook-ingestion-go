@@ -54,12 +54,6 @@ type CreateSubscriptionRequest struct {
 	Secret       *string `json:"secret,omitempty"`
 }
 
-// ErrorResponse represents an error response.
-type ErrorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message,omitempty"`
-}
-
 // ServeHTTP handles subscription-related HTTP requests.
 func (h *SubscriptionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
