@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ad-tracker/youtube-webhook-ingestion/internal/db/models"
+	"ad-tracker/youtube-webhook-ingestion/internal/db/repository"
 	"ad-tracker/youtube-webhook-ingestion/internal/service"
 
 	"github.com/stretchr/testify/assert"
@@ -68,7 +69,7 @@ func (m *mockSubscriptionRepository) GetByStatus(ctx context.Context, status str
 	return args.Get(0).([]*models.Subscription), args.Error(1)
 }
 
-func (m *mockSubscriptionRepository) List(ctx context.Context, filters interface{}) ([]*models.Subscription, int, error) {
+func (m *mockSubscriptionRepository) List(ctx context.Context, filters *repository.SubscriptionFilters) ([]*models.Subscription, int, error) {
 	args := m.Called(ctx, filters)
 	if args.Get(0) == nil {
 		return nil, args.Int(1), args.Error(2)
