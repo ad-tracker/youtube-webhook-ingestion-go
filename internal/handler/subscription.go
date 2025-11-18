@@ -22,24 +22,27 @@ var (
 
 // SubscriptionHandler handles HTTP requests for managing PubSubHubbub subscriptions.
 type SubscriptionHandler struct {
-	repo       repository.SubscriptionRepository
-	hubService service.PubSubHub
-	logger     *slog.Logger
+	repo          repository.SubscriptionRepository
+	hubService    service.PubSubHub
+	webhookSecret string
+	logger        *slog.Logger
 }
 
 // NewSubscriptionHandler creates a new SubscriptionHandler.
 func NewSubscriptionHandler(
 	repo repository.SubscriptionRepository,
 	hubService service.PubSubHub,
+	webhookSecret string,
 	logger *slog.Logger,
 ) *SubscriptionHandler {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &SubscriptionHandler{
-		repo:       repo,
-		hubService: hubService,
-		logger:     logger,
+		repo:          repo,
+		hubService:    hubService,
+		webhookSecret: webhookSecret,
+		logger:        logger,
 	}
 }
 
@@ -89,8 +92,14 @@ func (h *SubscriptionHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 		req.LeaseSeconds = 432000 // 5 days default
 	}
 
+	// Use configured webhook secret if not explicitly provided in request
+	secret := req.Secret
+	if (secret == nil || *secret == "") && h.webhookSecret != "" {
+		secret = &h.webhookSecret
+	}
+
 	// Create subscription model
-	sub := models.NewSubscription(req.ChannelID, req.CallbackURL, req.LeaseSeconds, req.Secret)
+	sub := models.NewSubscription(req.ChannelID, req.CallbackURL, req.LeaseSeconds, secret)
 
 	// Subscribe via PubSubHubbub
 	hubReq := &service.SubscribeRequest{

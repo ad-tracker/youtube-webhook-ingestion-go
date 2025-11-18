@@ -69,7 +69,7 @@ func main() {
 
 	// Initialize handlers
 	webhookHandler := handler.NewWebhookHandler(processor, config.WebhookSecret, logger)
-	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionRepo, pubSubHubService, logger)
+	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, logger)
 	getSubscriptionHandler := handler.NewGetSubscriptionHandler(subscriptionRepo, logger)
 
 	// Initialize authentication middleware

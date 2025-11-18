@@ -100,7 +100,7 @@ func TestSubscriptionHandler_HandleCreate_Success(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
@@ -147,7 +147,7 @@ func TestSubscriptionHandler_HandleCreate_WithSecret(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", nil)
 
 	secret := "my-secret"
 	reqBody := CreateSubscriptionRequest{
@@ -183,7 +183,7 @@ func TestSubscriptionHandler_HandleCreate_DefaultLeaseSeconds(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
@@ -217,7 +217,7 @@ func TestSubscriptionHandler_HandleCreate_InvalidJSON(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader([]byte("invalid json")))
 	rec := httptest.NewRecorder()
@@ -296,7 +296,7 @@ func TestSubscriptionHandler_HandleCreate_ValidationErrors(t *testing.T) {
 
 			repo := new(mockSubscriptionRepository)
 			hubService := new(mockPubSubHubService)
-			handler := NewSubscriptionHandler(repo, &service.PubSubHubService{}, nil)
+			handler := NewSubscriptionHandler(repo, &service.PubSubHubService{}, "", nil)
 			handler.hubService = hubService
 
 			body, _ := json.Marshal(tt.reqBody)
@@ -320,7 +320,7 @@ func TestSubscriptionHandler_HandleCreate_HubSubscriptionFailed(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
@@ -352,7 +352,7 @@ func TestSubscriptionHandler_HandleCreate_DatabaseError(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
@@ -390,7 +390,7 @@ func TestSubscriptionHandler_HandleCreate_DuplicateSubscription(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
@@ -429,7 +429,7 @@ func TestSubscriptionHandler_MethodNotAllowed(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/subscriptions", nil)
 	rec := httptest.NewRecorder()
@@ -528,4 +528,157 @@ func TestGetSubscriptionHandler_MethodNotAllowed(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestSubscriptionHandler_HandleCreate_AutomaticWebhookSecret(t *testing.T) {
+	t.Parallel()
+
+	repo := new(mockSubscriptionRepository)
+	hubService := new(mockPubSubHubService)
+	webhookSecret := "configured-webhook-secret"
+	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, nil)
+
+	reqBody := CreateSubscriptionRequest{
+		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
+		CallbackURL:  "https://example.com/webhook",
+		LeaseSeconds: 432000,
+		// No Secret provided - should use configured webhookSecret
+	}
+	body, _ := json.Marshal(reqBody)
+
+	hubResp := &service.SubscribeResponse{
+		Accepted:   true,
+		StatusCode: http.StatusAccepted,
+	}
+	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
+		return req.Secret != nil && *req.Secret == webhookSecret
+	})).Return(hubResp, nil)
+
+	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
+		return sub.Secret != nil && *sub.Secret == webhookSecret
+	})).Return(nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	hubService.AssertExpectations(t)
+	repo.AssertExpectations(t)
+}
+
+func TestSubscriptionHandler_HandleCreate_ExplicitSecretOverridesConfigured(t *testing.T) {
+	t.Parallel()
+
+	repo := new(mockSubscriptionRepository)
+	hubService := new(mockPubSubHubService)
+	webhookSecret := "configured-webhook-secret"
+	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, nil)
+
+	explicitSecret := "explicit-secret"
+	reqBody := CreateSubscriptionRequest{
+		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
+		CallbackURL:  "https://example.com/webhook",
+		LeaseSeconds: 432000,
+		Secret:       &explicitSecret, // Explicit secret should be used
+	}
+	body, _ := json.Marshal(reqBody)
+
+	hubResp := &service.SubscribeResponse{
+		Accepted:   true,
+		StatusCode: http.StatusAccepted,
+	}
+	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
+		return req.Secret != nil && *req.Secret == explicitSecret
+	})).Return(hubResp, nil)
+
+	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
+		return sub.Secret != nil && *sub.Secret == explicitSecret
+	})).Return(nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	hubService.AssertExpectations(t)
+	repo.AssertExpectations(t)
+}
+
+func TestSubscriptionHandler_HandleCreate_EmptySecretUsesConfigured(t *testing.T) {
+	t.Parallel()
+
+	repo := new(mockSubscriptionRepository)
+	hubService := new(mockPubSubHubService)
+	webhookSecret := "configured-webhook-secret"
+	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, nil)
+
+	emptySecret := ""
+	reqBody := CreateSubscriptionRequest{
+		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
+		CallbackURL:  "https://example.com/webhook",
+		LeaseSeconds: 432000,
+		Secret:       &emptySecret, // Empty secret should trigger use of configured secret
+	}
+	body, _ := json.Marshal(reqBody)
+
+	hubResp := &service.SubscribeResponse{
+		Accepted:   true,
+		StatusCode: http.StatusAccepted,
+	}
+	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
+		return req.Secret != nil && *req.Secret == webhookSecret
+	})).Return(hubResp, nil)
+
+	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
+		return sub.Secret != nil && *sub.Secret == webhookSecret
+	})).Return(nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	hubService.AssertExpectations(t)
+	repo.AssertExpectations(t)
+}
+
+func TestSubscriptionHandler_HandleCreate_NoSecretWhenConfiguredIsEmpty(t *testing.T) {
+	t.Parallel()
+
+	repo := new(mockSubscriptionRepository)
+	hubService := new(mockPubSubHubService)
+	handler := NewSubscriptionHandler(repo, hubService, "", nil) // No configured secret
+
+	reqBody := CreateSubscriptionRequest{
+		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
+		CallbackURL:  "https://example.com/webhook",
+		LeaseSeconds: 432000,
+		// No Secret provided and no configured secret
+	}
+	body, _ := json.Marshal(reqBody)
+
+	hubResp := &service.SubscribeResponse{
+		Accepted:   true,
+		StatusCode: http.StatusAccepted,
+	}
+	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
+		return req.Secret == nil // Should be nil when no secret configured
+	})).Return(hubResp, nil)
+
+	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
+		return sub.Secret == nil
+	})).Return(nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	hubService.AssertExpectations(t)
+	repo.AssertExpectations(t)
 }
