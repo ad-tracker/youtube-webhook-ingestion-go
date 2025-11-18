@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"ad-tracker/youtube-webhook-ingestion/internal/db"
 	"ad-tracker/youtube-webhook-ingestion/internal/db/models"
@@ -33,6 +34,18 @@ type SubscriptionRepository interface {
 
 	// GetByStatus retrieves subscriptions by status.
 	GetByStatus(ctx context.Context, status string, limit int) ([]*models.Subscription, error)
+
+	// List retrieves subscriptions with filters and pagination.
+	List(ctx context.Context, filters *SubscriptionFilters) ([]*models.Subscription, int, error)
+}
+
+// SubscriptionFilters contains filter options for listing subscriptions.
+type SubscriptionFilters struct {
+	Limit         int
+	Offset        int
+	ChannelID     string
+	Status        string
+	ExpiresBefore *time.Time
 }
 
 type subscriptionRepository struct {
@@ -214,6 +227,69 @@ func (r *subscriptionRepository) GetByStatus(ctx context.Context, status string,
 	defer rows.Close()
 
 	return scanSubscriptions(rows)
+}
+
+func (r *subscriptionRepository) List(ctx context.Context, filters *SubscriptionFilters) ([]*models.Subscription, int, error) {
+	args := []interface{}{}
+	argPos := 1
+	whereClauses := []string{}
+
+	if filters.ChannelID != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("channel_id = $%d", argPos))
+		args = append(args, filters.ChannelID)
+		argPos++
+	}
+
+	if filters.Status != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("status = $%d", argPos))
+		args = append(args, filters.Status)
+		argPos++
+	}
+
+	if filters.ExpiresBefore != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf("expires_at <= $%d", argPos))
+		args = append(args, *filters.ExpiresBefore)
+		argPos++
+	}
+
+	whereClause := ""
+	if len(whereClauses) > 0 {
+		whereClause = "WHERE " + fmt.Sprintf("%s", whereClauses[0])
+		for i := 1; i < len(whereClauses); i++ {
+			whereClause += " AND " + whereClauses[i]
+		}
+	}
+
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM pubsub_subscriptions %s", whereClause)
+	var total int
+	err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, db.WrapError(err, "count subscriptions")
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
+		       expires_at, status, secret, last_verified_at, created_at, updated_at
+		FROM pubsub_subscriptions
+		%s
+		ORDER BY created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, whereClause, argPos, argPos+1)
+
+	args = append(args, filters.Limit, filters.Offset)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, db.WrapError(err, "list subscriptions")
+	}
+	defer rows.Close()
+
+	subscriptions, err := scanSubscriptions(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return subscriptions, total, nil
 }
 
 // Helper function to scan multiple subscriptions from query results
