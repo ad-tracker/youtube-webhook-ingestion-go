@@ -284,9 +284,9 @@ func (h *WebhookEventHandler) handleList(w http.ResponseWriter, r *http.Request)
 	}
 
 	response := map[string]interface{}{
-		"items": events,
-		"total": total,
-		"limit": limit,
+		"items":  events,
+		"total":  total,
+		"limit":  limit,
 		"offset": offset,
 	}
 
@@ -480,9 +480,9 @@ func (h *ChannelHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]interface{}{
-		"items": channels,
-		"total": total,
-		"limit": limit,
+		"items":  channels,
+		"total":  total,
+		"limit":  limit,
 		"offset": offset,
 	}
 
