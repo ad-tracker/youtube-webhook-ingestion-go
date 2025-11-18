@@ -8,6 +8,7 @@ import (
 
 	"ad-tracker/youtube-webhook-ingestion/internal/db"
 	"ad-tracker/youtube-webhook-ingestion/internal/db/models"
+	"ad-tracker/youtube-webhook-ingestion/internal/db/repository"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -50,6 +51,24 @@ func (m *mockWebhookEventRepo) GetEventsByVideoID(ctx context.Context, videoID s
 	return args.Get(0).([]*models.WebhookEvent), args.Error(1)
 }
 
+func (m *mockWebhookEventRepo) Create(ctx context.Context, event *models.WebhookEvent) error {
+	args := m.Called(ctx, event)
+	return args.Error(0)
+}
+
+func (m *mockWebhookEventRepo) UpdateProcessingStatus(ctx context.Context, eventID int64, processed bool, processingError string) error {
+	args := m.Called(ctx, eventID, processed, processingError)
+	return args.Error(0)
+}
+
+func (m *mockWebhookEventRepo) List(ctx context.Context, filters *repository.WebhookEventFilters) ([]*models.WebhookEvent, int, error) {
+	args := m.Called(ctx, filters)
+	if args.Get(0) == nil {
+		return nil, args.Int(1), args.Error(2)
+	}
+	return args.Get(0).([]*models.WebhookEvent), args.Int(1), args.Error(2)
+}
+
 type mockVideoRepo struct {
 	mock.Mock
 }
@@ -82,6 +101,29 @@ func (m *mockVideoRepo) GetVideosByPublishedDate(ctx context.Context, since time
 	return args.Get(0).([]*models.Video), args.Error(1)
 }
 
+func (m *mockVideoRepo) Create(ctx context.Context, video *models.Video) error {
+	args := m.Called(ctx, video)
+	return args.Error(0)
+}
+
+func (m *mockVideoRepo) Update(ctx context.Context, video *models.Video) error {
+	args := m.Called(ctx, video)
+	return args.Error(0)
+}
+
+func (m *mockVideoRepo) Delete(ctx context.Context, videoID string) error {
+	args := m.Called(ctx, videoID)
+	return args.Error(0)
+}
+
+func (m *mockVideoRepo) List(ctx context.Context, filters *repository.VideoFilters) ([]*models.Video, int, error) {
+	args := m.Called(ctx, filters)
+	if args.Get(0) == nil {
+		return nil, args.Int(1), args.Error(2)
+	}
+	return args.Get(0).([]*models.Video), args.Int(1), args.Error(2)
+}
+
 type mockChannelRepo struct {
 	mock.Mock
 }
@@ -109,6 +151,29 @@ func (m *mockChannelRepo) GetChannelsByLastUpdated(ctx context.Context, since ti
 	return args.Get(0).([]*models.Channel), args.Error(1)
 }
 
+func (m *mockChannelRepo) Create(ctx context.Context, channel *models.Channel) error {
+	args := m.Called(ctx, channel)
+	return args.Error(0)
+}
+
+func (m *mockChannelRepo) Update(ctx context.Context, channel *models.Channel) error {
+	args := m.Called(ctx, channel)
+	return args.Error(0)
+}
+
+func (m *mockChannelRepo) Delete(ctx context.Context, channelID string) error {
+	args := m.Called(ctx, channelID)
+	return args.Error(0)
+}
+
+func (m *mockChannelRepo) List(ctx context.Context, filters *repository.ChannelFilters) ([]*models.Channel, int, error) {
+	args := m.Called(ctx, filters)
+	if args.Get(0) == nil {
+		return nil, args.Int(1), args.Error(2)
+	}
+	return args.Get(0).([]*models.Channel), args.Int(1), args.Error(2)
+}
+
 type mockVideoUpdateRepo struct {
 	mock.Mock
 }
@@ -131,6 +196,22 @@ func (m *mockVideoUpdateRepo) GetUpdatesByChannelID(ctx context.Context, channel
 func (m *mockVideoUpdateRepo) GetRecentUpdates(ctx context.Context, limit int) ([]*models.VideoUpdate, error) {
 	args := m.Called(ctx, limit)
 	return args.Get(0).([]*models.VideoUpdate), args.Error(1)
+}
+
+func (m *mockVideoUpdateRepo) GetUpdateByID(ctx context.Context, id int64) (*models.VideoUpdate, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.VideoUpdate), args.Error(1)
+}
+
+func (m *mockVideoUpdateRepo) List(ctx context.Context, filters *repository.VideoUpdateFilters) ([]*models.VideoUpdate, int, error) {
+	args := m.Called(ctx, filters)
+	if args.Get(0) == nil {
+		return nil, args.Int(1), args.Error(2)
+	}
+	return args.Get(0).([]*models.VideoUpdate), args.Int(1), args.Error(2)
 }
 
 func TestEventProcessor_ProcessEvent_InvalidXML(t *testing.T) {
