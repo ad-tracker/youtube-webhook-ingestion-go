@@ -15,6 +15,11 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Build the server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags="-s -w -X main.version=$(git describe --tags --always --dirty)" \
+    -o server ./cmd/server
+
 # Build the migration tool
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
     -ldflags="-s -w -X main.version=$(git describe --tags --always --dirty)" \
@@ -32,11 +37,21 @@ RUN addgroup -g 1000 appuser && \
 
 WORKDIR /app
 
-# Copy binary from builder
+# Copy binaries from builder
+COPY --from=builder /build/server /app/server
 COPY --from=builder /build/migrate /app/migrate
 
 # Copy migrations directory
 COPY --from=builder /build/migrations /app/migrations
+
+# Create entrypoint script to route to correct binary
+RUN printf '#!/bin/sh\n\
+# Check if first argument is -direction (migrate command)\n\
+if [ "$1" = "-direction" ]; then\n\
+  exec /app/migrate "$@"\n\
+else\n\
+  exec /app/server "$@"\n\
+fi\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Change ownership
 RUN chown -R appuser:appuser /app
@@ -47,9 +62,9 @@ USER appuser
 # Set environment variables
 ENV PATH="/app:${PATH}"
 
-# Expose any ports if needed (uncomment if your app needs it)
-# EXPOSE 8080
+# Expose port for the web server
+EXPOSE 8080
 
-# Default command
-ENTRYPOINT ["/app/migrate"]
-CMD ["--help"]
+# Default entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD []
