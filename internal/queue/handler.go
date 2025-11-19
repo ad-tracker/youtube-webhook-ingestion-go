@@ -14,8 +14,8 @@ import (
 
 // EnrichmentHandler handles video enrichment tasks
 type EnrichmentHandler struct {
-	youtubeClient *youtube.Client
-	quotaManager  *quota.Manager
+	youtubeClient  *youtube.Client
+	quotaManager   *quota.Manager
 	enrichmentRepo repository.EnrichmentRepository
 	jobRepo        repository.EnrichmentJobRepository
 	batchSize      int

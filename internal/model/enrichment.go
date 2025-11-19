@@ -8,13 +8,13 @@ type VideoEnrichment struct {
 	VideoID string `json:"video_id"`
 
 	// Basic metadata
-	Description             *string `json:"description"`
-	Duration                *string `json:"duration"`                 // ISO 8601 format (e.g., "PT4M13S")
-	Dimension               *string `json:"dimension"`                // "2d" or "3d"
-	Definition              *string `json:"definition"`               // "hd" or "sd"
-	Caption                 *string `json:"caption"`                  // "true" or "false"
-	LicensedContent         *bool   `json:"licensed_content"`
-	Projection              *string `json:"projection"`               // "rectangular" or "360"
+	Description     *string `json:"description"`
+	Duration        *string `json:"duration"`   // ISO 8601 format (e.g., "PT4M13S")
+	Dimension       *string `json:"dimension"`  // "2d" or "3d"
+	Definition      *string `json:"definition"` // "hd" or "sd"
+	Caption         *string `json:"caption"`    // "true" or "false"
+	LicensedContent *bool   `json:"licensed_content"`
+	Projection      *string `json:"projection"` // "rectangular" or "360"
 
 	// Thumbnails
 	ThumbnailDefaultURL     *string `json:"thumbnail_default_url"`
@@ -48,16 +48,16 @@ type VideoEnrichment struct {
 	TopicCategories      []string `json:"topic_categories"`       // Wikipedia URLs
 
 	// Content classification
-	PrivacyStatus            *string `json:"privacy_status"`             // "public", "unlisted", "private"
-	License                  *string `json:"license"`                    // "youtube" or "creativeCommon"
-	Embeddable               *bool   `json:"embeddable"`
-	PublicStatsViewable      *bool   `json:"public_stats_viewable"`
-	MadeForKids              *bool   `json:"made_for_kids"`
-	SelfDeclaredMadeForKids  *bool   `json:"self_declared_made_for_kids"`
+	PrivacyStatus           *string `json:"privacy_status"` // "public", "unlisted", "private"
+	License                 *string `json:"license"`        // "youtube" or "creativeCommon"
+	Embeddable              *bool   `json:"embeddable"`
+	PublicStatsViewable     *bool   `json:"public_stats_viewable"`
+	MadeForKids             *bool   `json:"made_for_kids"`
+	SelfDeclaredMadeForKids *bool   `json:"self_declared_made_for_kids"`
 
 	// Upload details
-	UploadStatus   *string `json:"upload_status"`   // "uploaded", "processed", "failed", "rejected", "deleted"
-	FailureReason  *string `json:"failure_reason"`  // If upload_status is "failed" or "rejected"
+	UploadStatus    *string `json:"upload_status"`    // "uploaded", "processed", "failed", "rejected", "deleted"
+	FailureReason   *string `json:"failure_reason"`   // If upload_status is "failed" or "rejected"
 	RejectionReason *string `json:"rejection_reason"` // If upload_status is "rejected"
 
 	// Live streaming details
@@ -94,43 +94,43 @@ type VideoEnrichment struct {
 
 // EnrichmentJob represents a job to enrich a video with YouTube API data
 type EnrichmentJob struct {
-	ID           int64                  `json:"id"`
-	AsynqTaskID  *string                `json:"asynq_task_id"`
-	JobType      string                 `json:"job_type"`
-	VideoID      string                 `json:"video_id"`
-	Status       string                 `json:"status"` // pending, processing, completed, failed, cancelled
-	Priority     int                    `json:"priority"`
-	ScheduledAt  time.Time              `json:"scheduled_at"`
-	StartedAt    *time.Time             `json:"started_at"`
-	CompletedAt  *time.Time             `json:"completed_at"`
-	Attempts     int                    `json:"attempts"`
-	MaxAttempts  int                    `json:"max_attempts"`
-	NextRetryAt  *time.Time             `json:"next_retry_at"`
-	ErrorMessage *string                `json:"error_message"`
-	ErrorStackTrace *string             `json:"error_stack_trace"`
-	Metadata     map[string]interface{} `json:"metadata"`
-	CreatedAt    time.Time              `json:"created_at"`
-	UpdatedAt    time.Time              `json:"updated_at"`
+	ID              int64                  `json:"id"`
+	AsynqTaskID     *string                `json:"asynq_task_id"`
+	JobType         string                 `json:"job_type"`
+	VideoID         string                 `json:"video_id"`
+	Status          string                 `json:"status"` // pending, processing, completed, failed, cancelled
+	Priority        int                    `json:"priority"`
+	ScheduledAt     time.Time              `json:"scheduled_at"`
+	StartedAt       *time.Time             `json:"started_at"`
+	CompletedAt     *time.Time             `json:"completed_at"`
+	Attempts        int                    `json:"attempts"`
+	MaxAttempts     int                    `json:"max_attempts"`
+	NextRetryAt     *time.Time             `json:"next_retry_at"`
+	ErrorMessage    *string                `json:"error_message"`
+	ErrorStackTrace *string                `json:"error_stack_trace"`
+	Metadata        map[string]interface{} `json:"metadata"`
+	CreatedAt       time.Time              `json:"created_at"`
+	UpdatedAt       time.Time              `json:"updated_at"`
 }
 
 // APIQuotaUsage tracks daily YouTube API quota consumption
 type APIQuotaUsage struct {
-	ID               int64     `json:"id"`
-	Date             time.Time `json:"date"`
-	QuotaUsed        int       `json:"quota_used"`
-	QuotaLimit       int       `json:"quota_limit"`
-	OperationsCount  int       `json:"operations_count"`
-	VideosListCalls  int       `json:"videos_list_calls"`
-	ChannelsListCalls int      `json:"channels_list_calls"`
-	OtherCalls       int       `json:"other_calls"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                int64     `json:"id"`
+	Date              time.Time `json:"date"`
+	QuotaUsed         int       `json:"quota_used"`
+	QuotaLimit        int       `json:"quota_limit"`
+	OperationsCount   int       `json:"operations_count"`
+	VideosListCalls   int       `json:"videos_list_calls"`
+	ChannelsListCalls int       `json:"channels_list_calls"`
+	OtherCalls        int       `json:"other_calls"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // QuotaInfo provides current quota status
 type QuotaInfo struct {
-	QuotaUsed      int `json:"quota_used"`
-	QuotaLimit     int `json:"quota_limit"`
-	QuotaRemaining int `json:"quota_remaining"`
+	QuotaUsed       int `json:"quota_used"`
+	QuotaLimit      int `json:"quota_limit"`
+	QuotaRemaining  int `json:"quota_remaining"`
 	OperationsCount int `json:"operations_count"`
 }

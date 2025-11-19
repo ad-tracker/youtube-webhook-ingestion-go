@@ -11,9 +11,9 @@ import (
 
 // Manager handles YouTube API quota management
 type Manager struct {
-	repo              repository.QuotaRepository
-	dailyLimit        int
-	thresholdPercent  int // Stop processing when this % of quota is used
+	repo             repository.QuotaRepository
+	dailyLimit       int
+	thresholdPercent int // Stop processing when this % of quota is used
 }
 
 // NewManager creates a new quota manager

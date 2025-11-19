@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	defaultConcurrency      = 2
-	defaultBatchSize        = 50
-	defaultDailyQuota       = 10000
-	defaultQuotaThreshold   = 90 // Stop at 90% of quota
+	defaultConcurrency    = 2
+	defaultBatchSize      = 50
+	defaultDailyQuota     = 10000
+	defaultQuotaThreshold = 90 // Stop at 90% of quota
 )
 
 type Config struct {

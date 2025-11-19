@@ -39,7 +39,7 @@ func (c *Client) Close() error {
 func (c *Client) EnqueueVideoEnrichment(ctx context.Context, videoID, channelID string, priority int) error {
 	// Create payload
 	payload, err := NewEnrichVideoTask(videoID, channelID, priority, map[string]interface{}{
-		"source":     "webhook",
+		"source":      "webhook",
 		"enqueued_at": time.Now().Format(time.RFC3339),
 	})
 	if err != nil {
