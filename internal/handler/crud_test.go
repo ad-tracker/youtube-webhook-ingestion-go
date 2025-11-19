@@ -417,6 +417,10 @@ func (m *mockChannelRepo) GetChannelByID(ctx context.Context, channelID string) 
 	return channel, nil
 }
 
+func (m *mockChannelRepo) GetByID(ctx context.Context, channelID string) (*models.Channel, error) {
+	return m.GetChannelByID(ctx, channelID)
+}
+
 func (m *mockChannelRepo) Update(ctx context.Context, channel *models.Channel) error {
 	if _, ok := m.channels[channel.ChannelID]; !ok {
 		return db.ErrNotFound

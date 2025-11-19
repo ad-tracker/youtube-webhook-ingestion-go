@@ -29,6 +29,9 @@ type ChannelRepository interface {
 	// GetChannelByID retrieves a single channel by ID.
 	GetChannelByID(ctx context.Context, channelID string) (*models.Channel, error)
 
+	// GetByID is an alias for GetChannelByID
+	GetByID(ctx context.Context, channelID string) (*models.Channel, error)
+
 	// ListChannels retrieves all channels with pagination.
 	ListChannels(ctx context.Context, limit, offset int) ([]*models.Channel, error)
 
@@ -114,6 +117,10 @@ func (r *channelRepository) GetChannelByID(ctx context.Context, channelID string
 	}
 
 	return channel, nil
+}
+
+func (r *channelRepository) GetByID(ctx context.Context, channelID string) (*models.Channel, error) {
+	return r.GetChannelByID(ctx, channelID)
 }
 
 func (r *channelRepository) ListChannels(ctx context.Context, limit, offset int) ([]*models.Channel, error) {

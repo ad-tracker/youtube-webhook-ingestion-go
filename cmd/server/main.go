@@ -16,6 +16,8 @@ import (
 	"ad-tracker/youtube-webhook-ingestion/internal/middleware"
 	"ad-tracker/youtube-webhook-ingestion/internal/queue"
 	"ad-tracker/youtube-webhook-ingestion/internal/service"
+	"ad-tracker/youtube-webhook-ingestion/internal/service/quota"
+	"ad-tracker/youtube-webhook-ingestion/internal/service/youtube"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -55,6 +57,8 @@ func main() {
 	channelRepo := repository.NewChannelRepository(pool)
 	videoUpdateRepo := repository.NewVideoUpdateRepository(pool)
 	subscriptionRepo := repository.NewSubscriptionRepository(pool)
+	channelEnrichmentRepo := repository.NewChannelEnrichmentRepository(pool)
+	quotaRepo := repository.NewQuotaRepository(pool)
 
 	// Initialize event processor
 	processor := service.NewEventProcessor(
@@ -83,6 +87,38 @@ func main() {
 	// Initialize PubSubHub service
 	pubSubHubService := service.NewPubSubHubService(&http.Client{}, logger)
 
+	// Initialize YouTube API client (optional - only if API key is provided)
+	var youtubeClient *youtube.Client
+	var quotaManager *quota.Manager
+	var channelResolverService *service.ChannelResolverService
+
+	if config.YouTubeAPIKey != "" {
+		var err error
+		youtubeClient, err = youtube.NewClient(config.YouTubeAPIKey)
+		if err != nil {
+			logger.Warn("failed to initialize YouTube API client, URL-based channel addition will not be available",
+				"error", err,
+			)
+		} else {
+			// Initialize quota manager
+			quotaManager = quota.NewManager(quotaRepo, 10000, 90)
+
+			// Initialize channel resolver service
+			channelResolverService = service.NewChannelResolverService(
+				youtubeClient,
+				channelRepo,
+				subscriptionRepo,
+				channelEnrichmentRepo,
+				quotaManager,
+				pubSubHubService,
+			)
+
+			logger.Info("YouTube API client initialized, URL-based channel addition is available")
+		}
+	} else {
+		logger.Info("YouTube API key not configured (YOUTUBE_API_KEY), URL-based channel addition will not be available")
+	}
+
 	// Initialize handlers
 	webhookHandler := handler.NewWebhookHandler(processor, config.WebhookSecret, logger)
 
@@ -92,6 +128,12 @@ func main() {
 	videoHandler := handler.NewVideoHandler(videoRepo, logger)
 	videoUpdateHandler := handler.NewVideoUpdateHandler(videoUpdateRepo, logger)
 	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, logger)
+
+	// Channel from URL handler (only if YouTube API is available)
+	var channelFromURLHandler *handler.ChannelFromURLHandler
+	if channelResolverService != nil {
+		channelFromURLHandler = handler.NewChannelFromURLHandler(channelResolverService, logger)
+	}
 
 	// Initialize authentication middleware
 	authMiddleware := middleware.NewAPIKeyAuth(config.APIKeys, logger)
@@ -107,6 +149,12 @@ func main() {
 	mux.Handle("/api/v1/webhook-events/", authMiddleware.Middleware(webhookEventHandler))
 	mux.Handle("/api/v1/channels", authMiddleware.Middleware(channelHandler))
 	mux.Handle("/api/v1/channels/", authMiddleware.Middleware(channelHandler))
+
+	// Channel from URL endpoint (only available if YouTube API is configured)
+	if channelFromURLHandler != nil {
+		mux.Handle("/api/v1/channels/from-url", authMiddleware.Middleware(http.HandlerFunc(channelFromURLHandler.HandleCreateFromURL)))
+	}
+
 	mux.Handle("/api/v1/videos", authMiddleware.Middleware(videoHandler))
 	mux.Handle("/api/v1/videos/", authMiddleware.Middleware(videoHandler))
 	mux.Handle("/api/v1/video-updates", authMiddleware.Middleware(videoUpdateHandler))
@@ -170,6 +218,7 @@ type Config struct {
 	WebhookSecret string
 	WebhookPath   string
 	APIKeys       []string
+	YouTubeAPIKey string
 }
 
 // loadConfig loads configuration from environment variables.
@@ -181,6 +230,7 @@ func loadConfig() *Config {
 		WebhookSecret: getEnv("WEBHOOK_SECRET", ""),
 		WebhookPath:   getEnv("WEBHOOK_PATH", defaultWebhookPath),
 		APIKeys:       parseAPIKeys(getEnv("API_KEYS", "")),
+		YouTubeAPIKey: getEnv("YOUTUBE_API_KEY", ""),
 	}
 
 	if config.DatabaseURL == "" {
