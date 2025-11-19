@@ -337,7 +337,6 @@ func (r *videoRepository) List(ctx context.Context, filters *VideoFilters) ([]*m
 	return videos, total, nil
 }
 
-// Helper function to scan multiple videos from query results
 func scanVideos(rows pgx.Rows) ([]*models.Video, error) {
 	var videos []*models.Video
 

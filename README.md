@@ -1,16 +1,29 @@
-# YouTube Webhook Ingestion - Database Layer
+# YouTube Webhook Ingestion Service
 
-This is the database layer implementation for a YouTube PubSubHubbub webhook ingestion service in Go.
+A production-ready Go service that receives, processes, and stores YouTube video notifications via PubSubHubbub webhooks.
+
+##  What This Does
+
+This service:
+1. Receives real-time YouTube webhook notifications when videos are published or updated
+2. Parses and validates video metadata from Atom feeds
+3. Deduplicates events using content hashing
+4. Stores immutable audit trails of all video changes
+5. Enriches video data using YouTube Data API v3 (optional)
+6. Provides REST API for managing subscriptions and querying data
 
 ## Features
 
-- Production-ready PostgreSQL database layer using pgx/v5
-- Immutable event sourcing for webhook events
-- Full audit trail for video updates
-- Comprehensive test coverage with testcontainers
-- Type-safe repository pattern
-- Proper error handling and context support
-- Database migrations with golang-migrate
+- **Event Sourcing**: Immutable webhook event store with SHA-256 deduplication
+- **Audit Trail**: Complete history of all video changes
+- **YouTube API Integration**: Optional enrichment with full video metadata
+- **Job Queue**: Async processing with Redis-backed Asynq
+- **REST API**: Full CRUD operations with API key authentication
+- **PubSubHubbub Protocol**: Complete implementation with signature verification
+- **Production-Ready**: Connection pooling, graceful shutdown, structured logging
+- **Type-Safe**: Repository pattern with comprehensive error handling
+- **Well-Tested**: Integration tests with real PostgreSQL via testcontainers
+- **Database Migrations**: Version-controlled schema with golang-migrate
 
 ## Project Structure
 
@@ -55,22 +68,56 @@ This is the database layer implementation for a YouTube PubSubHubbub webhook ing
 └── README.md
 ```
 
+## Quick Start
+
+### Prerequisites
+- Go 1.25.3 or later
+- PostgreSQL 14+
+- (Optional) Redis for job queue
+- (Optional) YouTube Data API v3 key
+
+### Run the Server
+
+```bash
+# Set environment variables
+export DATABASE_URL="postgres://user:password@localhost:5432/youtube_webhooks?sslmode=disable"
+export API_KEYS="your-api-key-here"
+export DOMAIN="yourdomain.com"
+
+# Run migrations
+go run ./cmd/migrate -direction up
+
+# Start the server
+go run ./cmd/server
+```
+
+The server will be available at `http://localhost:8080`.
+
+### Test the Webhook
+
+```bash
+# Health check
+curl http://localhost:8080/health
+
+# Subscription verification
+curl "http://localhost:8080/webhook?hub.challenge=test123"
+```
+
 ## Database Schema
 
-The schema consists of 4 tables:
+The schema consists of 9 tables:
 
 1. **webhook_events** (immutable) - Raw webhook notifications from YouTube
 2. **channels** - Normalized channel information
 3. **videos** - Normalized video information
 4. **video_updates** (immutable) - Audit trail of all video updates
+5. **pubsub_subscriptions** - YouTube PubSubHubbub subscriptions
+6. **video_api_enrichments** - Enriched video metadata from YouTube API
+7. **channel_api_enrichments** - Enriched channel metadata
+8. **api_quota_usage** - YouTube API quota tracking
+9. **enrichment_jobs** - Job queue metadata
 
 See [docs/database-schema.md](docs/database-schema.md) for detailed schema documentation.
-
-## Installation
-
-```bash
-go get ad-tracker/youtube-webhook-ingestion
-```
 
 ## Running Migrations
 
@@ -378,8 +425,38 @@ All database operations accept `context.Context` for proper cancellation and tim
 
 - **github.com/jackc/pgx/v5** - PostgreSQL driver and connection pooling
 - **github.com/golang-migrate/migrate/v4** - Database migrations
-- **github.com/testcontainers/testcontainers-go** - Integration testing with real PostgreSQL
+- **github.com/hibiken/asynq** - Job queue with Redis backend
+- **google.golang.org/api/youtube/v3** - YouTube Data API client
+- **github.com/testcontainers/testcontainers-go** - Integration testing
 - **github.com/stretchr/testify** - Testing assertions
+
+## Documentation
+
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Complete architecture overview, design patterns, and data flows
+- **[docs/API.md](docs/API.md)** - REST API reference with authentication and examples
+- **[docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)** - API key authentication guide
+- **[docs/database-schema.md](docs/database-schema.md)** - Detailed database schema documentation
+
+## Components
+
+### HTTP Server (`cmd/server`)
+- PubSubHubbub webhook endpoint
+- REST API for subscriptions and data queries
+- Health check endpoint
+- API key authentication
+
+### Enricher Worker (`cmd/enricher`)
+- Processes enrichment jobs from Redis queue
+- Fetches video metadata from YouTube Data API v3
+- Tracks API quota usage
+
+### Renewal Service (`cmd/renewer`)
+- Automatically renews expiring PubSubHubbub subscriptions
+- Configurable renewal threshold
+
+### Migration Tool (`cmd/migrate`)
+- Applies database schema migrations
+- Supports up/down migrations
 
 ## License
 

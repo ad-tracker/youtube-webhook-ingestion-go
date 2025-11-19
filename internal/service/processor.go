@@ -57,7 +57,6 @@ func (p *eventProcessor) SetQueueClient(client *queue.Client) {
 }
 
 func (p *eventProcessor) ProcessEvent(ctx context.Context, rawXML string) error {
-	// Parse the Atom feed
 	videoData, err := parser.ParseAtomFeed(rawXML)
 	if err != nil {
 		return fmt.Errorf("parse atom feed: %w", err)
@@ -99,11 +98,9 @@ func (p *eventProcessor) ProcessEvent(ctx context.Context, rawXML string) error 
 
 	if err := p.webhookEventRepo.MarkEventProcessed(ctx, webhookEvent.ID, errMsg); err != nil {
 		// Log this but don't return - the event was already created
-		// In production, you'd want proper logging here
 		return fmt.Errorf("mark event processed: %w (original error: %v)", err, processingErr)
 	}
 
-	// Return the original processing error if there was one
 	if processingErr != nil {
 		return fmt.Errorf("process projections: %w", processingErr)
 	}
@@ -130,23 +127,19 @@ func (p *eventProcessor) ProcessEvent(ctx context.Context, rawXML string) error 
 }
 
 func (p *eventProcessor) processProjections(ctx context.Context, webhookEventID int64, videoData *parser.VideoData) error {
-	// Start a transaction for projection updates
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx) // Rollback is safe to call even if committed
 
-	// Get existing video to determine update type
 	existingVideo, err := p.videoRepo.GetVideoByID(ctx, videoData.VideoID)
 	if err != nil && !db.IsNotFound(err) {
 		return fmt.Errorf("get existing video: %w", err)
 	}
 
-	// Determine update type
 	updateType := p.determineUpdateType(existingVideo, videoData)
 
-	// Upsert channel
 	channel := models.NewChannel(
 		videoData.ChannelID,
 		"", // Channel title not available in feed
@@ -156,7 +149,6 @@ func (p *eventProcessor) processProjections(ctx context.Context, webhookEventID 
 		return fmt.Errorf("upsert channel: %w", err)
 	}
 
-	// Upsert video
 	video := models.NewVideo(
 		videoData.VideoID,
 		videoData.ChannelID,
@@ -168,7 +160,6 @@ func (p *eventProcessor) processProjections(ctx context.Context, webhookEventID 
 		return fmt.Errorf("upsert video: %w", err)
 	}
 
-	// Create video update record
 	videoUpdate := models.NewVideoUpdate(
 		webhookEventID,
 		videoData.VideoID,
@@ -182,7 +173,6 @@ func (p *eventProcessor) processProjections(ctx context.Context, webhookEventID 
 		return fmt.Errorf("create video update: %w", err)
 	}
 
-	// Commit the transaction
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
@@ -191,16 +181,13 @@ func (p *eventProcessor) processProjections(ctx context.Context, webhookEventID 
 }
 
 func (p *eventProcessor) determineUpdateType(existingVideo *models.Video, videoData *parser.VideoData) models.UpdateType {
-	// If video doesn't exist, it's a new video
 	if existingVideo == nil {
 		return models.UpdateTypeNewVideo
 	}
 
-	// If title changed, it's a title update
 	if existingVideo.Title != videoData.Title {
 		return models.UpdateTypeTitleUpdate
 	}
 
-	// Otherwise, it's an unknown update type
 	return models.UpdateTypeUnknown
 }
