@@ -171,7 +171,7 @@ func loadConfig() *Config {
 
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		redisURL = "redis://localhost:6379/0"
+		redisURL = "localhost:6379"
 	}
 
 	youtubeAPIKey := os.Getenv("YOUTUBE_API_KEY")
