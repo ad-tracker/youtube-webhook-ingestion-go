@@ -48,10 +48,9 @@ func NewSubscriptionHandler(
 
 // CreateSubscriptionRequest represents the request body for creating a subscription.
 type CreateSubscriptionRequest struct {
-	ChannelID    string  `json:"channel_id"`
-	CallbackURL  string  `json:"callback_url"`
-	LeaseSeconds int     `json:"lease_seconds,omitempty"`
-	Secret       *string `json:"secret,omitempty"`
+	ChannelID    string `json:"channel_id"`
+	CallbackURL  string `json:"callback_url"`
+	LeaseSeconds int    `json:"lease_seconds,omitempty"`
 }
 
 // ServeHTTP handles subscription-related HTTP requests.
@@ -86,14 +85,8 @@ func (h *SubscriptionHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 		req.LeaseSeconds = 432000 // 5 days default
 	}
 
-	// Use configured webhook secret if not explicitly provided in request
-	secret := req.Secret
-	if (secret == nil || *secret == "") && h.webhookSecret != "" {
-		secret = &h.webhookSecret
-	}
-
 	// Create subscription model
-	sub := models.NewSubscription(req.ChannelID, req.CallbackURL, req.LeaseSeconds, secret)
+	sub := models.NewSubscription(req.ChannelID, req.CallbackURL, req.LeaseSeconds)
 
 	// Subscribe via PubSubHubbub
 	hubReq := &service.SubscribeRequest{
@@ -101,7 +94,7 @@ func (h *SubscriptionHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 		TopicURL:     sub.TopicURL,
 		CallbackURL:  sub.CallbackURL,
 		LeaseSeconds: sub.LeaseSeconds,
-		Secret:       sub.Secret,
+		Secret:       &h.webhookSecret,
 	}
 
 	h.logger.Info("attempting to subscribe to PubSubHub",

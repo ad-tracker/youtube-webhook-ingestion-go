@@ -54,10 +54,11 @@ func main() {
 
 	// Create renewal service
 	renewalService := &RenewalService{
-		repo:       subscriptionRepo,
-		hubService: pubSubHubService,
-		logger:     logger,
-		batchSize:  config.BatchSize,
+		repo:          subscriptionRepo,
+		hubService:    pubSubHubService,
+		logger:        logger,
+		batchSize:     config.BatchSize,
+		webhookSecret: config.WebhookSecret,
 	}
 
 	// Set up graceful shutdown
@@ -92,10 +93,11 @@ func main() {
 
 // RenewalService handles automatic renewal of expiring subscriptions.
 type RenewalService struct {
-	repo       repository.SubscriptionRepository
-	hubService service.PubSubHub
-	logger     *slog.Logger
-	batchSize  int
+	repo          repository.SubscriptionRepository
+	hubService    service.PubSubHub
+	logger        *slog.Logger
+	batchSize     int
+	webhookSecret string
 }
 
 // RenewExpiring finds expiring subscriptions and renews them.
@@ -152,7 +154,7 @@ func (s *RenewalService) renewSubscription(ctx context.Context, sub *models.Subs
 		TopicURL:     sub.TopicURL,
 		CallbackURL:  sub.CallbackURL,
 		LeaseSeconds: sub.LeaseSeconds,
-		Secret:       sub.Secret,
+		Secret:       &s.webhookSecret,
 	}
 
 	// Subscribe via PubSubHub
@@ -188,6 +190,7 @@ func (s *RenewalService) renewSubscription(ctx context.Context, sub *models.Subs
 // Config holds application configuration.
 type Config struct {
 	DatabaseURL     string
+	WebhookSecret   string
 	RenewalInterval time.Duration
 	BatchSize       int
 }
@@ -196,12 +199,20 @@ type Config struct {
 func loadConfig() *Config {
 	config := &Config{
 		DatabaseURL:     getEnv("DATABASE_URL", ""),
+		WebhookSecret:   getEnv("WEBHOOK_SECRET", ""),
 		RenewalInterval: parseDuration(getEnv("RENEWAL_INTERVAL", "6h")),
 		BatchSize:       parseInt(getEnv("BATCH_SIZE", "100")),
 	}
 
 	if config.DatabaseURL == "" {
 		slog.Error("DATABASE_URL environment variable is required")
+		os.Exit(1)
+	}
+
+	if config.WebhookSecret == "" {
+		slog.Error("WEBHOOK_SECRET environment variable is required",
+			"help", "This secret is used when renewing subscriptions with YouTube PubSubHub",
+		)
 		os.Exit(1)
 	}
 

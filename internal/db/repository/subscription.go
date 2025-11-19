@@ -61,9 +61,9 @@ func (r *subscriptionRepository) Create(ctx context.Context, sub *models.Subscri
 	query := `
 		INSERT INTO pubsub_subscriptions (
 			channel_id, topic_url, callback_url, hub_url, lease_seconds,
-			expires_at, status, secret, created_at, updated_at
+			expires_at, status, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at
 	`
 
@@ -75,7 +75,6 @@ func (r *subscriptionRepository) Create(ctx context.Context, sub *models.Subscri
 		sub.LeaseSeconds,
 		sub.ExpiresAt,
 		sub.Status,
-		sub.Secret,
 		sub.CreatedAt,
 		sub.UpdatedAt,
 	).Scan(
@@ -94,7 +93,7 @@ func (r *subscriptionRepository) Create(ctx context.Context, sub *models.Subscri
 func (r *subscriptionRepository) GetByID(ctx context.Context, id int64) (*models.Subscription, error) {
 	query := `
 		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
-		       expires_at, status, secret, last_verified_at, created_at, updated_at
+		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		WHERE id = $1
 	`
@@ -109,7 +108,6 @@ func (r *subscriptionRepository) GetByID(ctx context.Context, id int64) (*models
 		&sub.LeaseSeconds,
 		&sub.ExpiresAt,
 		&sub.Status,
-		&sub.Secret,
 		&sub.LastVerifiedAt,
 		&sub.CreatedAt,
 		&sub.UpdatedAt,
@@ -125,7 +123,7 @@ func (r *subscriptionRepository) GetByID(ctx context.Context, id int64) (*models
 func (r *subscriptionRepository) GetByChannelID(ctx context.Context, channelID string) ([]*models.Subscription, error) {
 	query := `
 		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
-		       expires_at, status, secret, last_verified_at, created_at, updated_at
+		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		WHERE channel_id = $1
 		ORDER BY created_at DESC
@@ -150,9 +148,8 @@ func (r *subscriptionRepository) Update(ctx context.Context, sub *models.Subscri
 		    lease_seconds = $5,
 		    expires_at = $6,
 		    status = $7,
-		    secret = $8,
-		    last_verified_at = $9
-		WHERE id = $10
+		    last_verified_at = $8
+		WHERE id = $9
 		RETURNING updated_at
 	`
 
@@ -164,7 +161,6 @@ func (r *subscriptionRepository) Update(ctx context.Context, sub *models.Subscri
 		sub.LeaseSeconds,
 		sub.ExpiresAt,
 		sub.Status,
-		sub.Secret,
 		sub.LastVerifiedAt,
 		sub.ID,
 	).Scan(&sub.UpdatedAt)
@@ -194,7 +190,7 @@ func (r *subscriptionRepository) Delete(ctx context.Context, id int64) error {
 func (r *subscriptionRepository) GetExpiringSoon(ctx context.Context, limit int) ([]*models.Subscription, error) {
 	query := `
 		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
-		       expires_at, status, secret, last_verified_at, created_at, updated_at
+		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		WHERE status = $1 AND expires_at <= NOW() + INTERVAL '24 hours'
 		ORDER BY expires_at ASC
@@ -213,7 +209,7 @@ func (r *subscriptionRepository) GetExpiringSoon(ctx context.Context, limit int)
 func (r *subscriptionRepository) GetByStatus(ctx context.Context, status string, limit int) ([]*models.Subscription, error) {
 	query := `
 		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
-		       expires_at, status, secret, last_verified_at, created_at, updated_at
+		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		WHERE status = $1
 		ORDER BY created_at DESC
@@ -269,7 +265,7 @@ func (r *subscriptionRepository) List(ctx context.Context, filters *Subscription
 
 	query := fmt.Sprintf(`
 		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
-		       expires_at, status, secret, last_verified_at, created_at, updated_at
+		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		%s
 		ORDER BY created_at DESC
@@ -307,7 +303,6 @@ func scanSubscriptions(rows pgx.Rows) ([]*models.Subscription, error) {
 			&sub.LeaseSeconds,
 			&sub.ExpiresAt,
 			&sub.Status,
-			&sub.Secret,
 			&sub.LastVerifiedAt,
 			&sub.CreatedAt,
 			&sub.UpdatedAt,
