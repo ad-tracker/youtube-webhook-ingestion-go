@@ -152,28 +152,28 @@ type ChannelEnrichment struct {
 	ThumbnailHighURL    *string `json:"thumbnail_high_url"`
 
 	// Statistics
-	ViewCount              *int64 `json:"view_count"`
-	SubscriberCount        *int64 `json:"subscriber_count"`
-	VideoCount             *int64 `json:"video_count"`
-	HiddenSubscriberCount  *bool  `json:"hidden_subscriber_count"`
+	ViewCount             *int64 `json:"view_count"`
+	SubscriberCount       *int64 `json:"subscriber_count"`
+	VideoCount            *int64 `json:"video_count"`
+	HiddenSubscriberCount *bool  `json:"hidden_subscriber_count"`
 
 	// Branding
 	BannerImageURL *string `json:"banner_image_url"`
 	Keywords       *string `json:"keywords"`
 
 	// Content details
-	RelatedPlaylistsLikes    *string `json:"related_playlists_likes"`
-	RelatedPlaylistsUploads  *string `json:"related_playlists_uploads"`
+	RelatedPlaylistsLikes     *string `json:"related_playlists_likes"`
+	RelatedPlaylistsUploads   *string `json:"related_playlists_uploads"`
 	RelatedPlaylistsFavorites *string `json:"related_playlists_favorites"`
 
 	// Topic details
 	TopicCategories []string `json:"topic_categories"`
 
 	// Status
-	PrivacyStatus      *string `json:"privacy_status"`
-	IsLinked           *bool   `json:"is_linked"`
-	LongUploadsStatus  *string `json:"long_uploads_status"`
-	MadeForKids        *bool   `json:"made_for_kids"`
+	PrivacyStatus     *string `json:"privacy_status"`
+	IsLinked          *bool   `json:"is_linked"`
+	LongUploadsStatus *string `json:"long_uploads_status"`
+	MadeForKids       *bool   `json:"made_for_kids"`
 
 	// API metadata
 	EnrichedAt        time.Time `json:"enriched_at"`
