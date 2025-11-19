@@ -57,7 +57,6 @@ func main() {
 	channelRepo := repository.NewChannelRepository(pool)
 	videoUpdateRepo := repository.NewVideoUpdateRepository(pool)
 	subscriptionRepo := repository.NewSubscriptionRepository(pool)
-	enrichmentRepo := repository.NewEnrichmentRepository(pool)
 	channelEnrichmentRepo := repository.NewChannelEnrichmentRepository(pool)
 	quotaRepo := repository.NewQuotaRepository(pool)
 

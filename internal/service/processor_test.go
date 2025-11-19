@@ -141,6 +141,10 @@ func (m *mockChannelRepo) GetChannelByID(ctx context.Context, channelID string) 
 	return args.Get(0).(*models.Channel), args.Error(1)
 }
 
+func (m *mockChannelRepo) GetByID(ctx context.Context, channelID string) (*models.Channel, error) {
+	return m.GetChannelByID(ctx, channelID)
+}
+
 func (m *mockChannelRepo) ListChannels(ctx context.Context, limit, offset int) ([]*models.Channel, error) {
 	args := m.Called(ctx, limit, offset)
 	return args.Get(0).([]*models.Channel), args.Error(1)
