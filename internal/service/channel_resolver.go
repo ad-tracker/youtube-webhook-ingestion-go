@@ -15,12 +15,12 @@ import (
 
 // ChannelResolverService orchestrates channel resolution and enrichment
 type ChannelResolverService struct {
-	youtubeClient     *youtube.Client
-	channelRepo       repository.ChannelRepository
-	subscriptionRepo  repository.SubscriptionRepository
-	enrichmentRepo    repository.ChannelEnrichmentRepository
-	quotaManager      *quota.Manager
-	pubSubHubService  *PubSubHubService
+	youtubeClient    *youtube.Client
+	channelRepo      repository.ChannelRepository
+	subscriptionRepo repository.SubscriptionRepository
+	enrichmentRepo   repository.ChannelEnrichmentRepository
+	quotaManager     *quota.Manager
+	pubSubHubService *PubSubHubService
 }
 
 // NewChannelResolverService creates a new channel resolver service
@@ -78,11 +78,11 @@ func (s *ChannelResolverService) ResolveChannelFromURL(ctx context.Context, req 
 
 	// Step 3: Create or update channel
 	channel := &models.Channel{
-		ChannelID:      ytEnrichment.ChannelID,
-		Title:          ytEnrichment.Title,
-		ChannelURL:     fmt.Sprintf("https://www.youtube.com/channel/%s", ytEnrichment.ChannelID),
-		FirstSeenAt:    ytEnrichment.PublishedAt,
-		LastUpdatedAt:  time.Now(),
+		ChannelID:     ytEnrichment.ChannelID,
+		Title:         ytEnrichment.Title,
+		ChannelURL:    fmt.Sprintf("https://www.youtube.com/channel/%s", ytEnrichment.ChannelID),
+		FirstSeenAt:   ytEnrichment.PublishedAt,
+		LastUpdatedAt: time.Now(),
 	}
 
 	if wasExisting {
@@ -139,13 +139,13 @@ func (s *ChannelResolverService) createSubscription(ctx context.Context, channel
 	topicURL := fmt.Sprintf("https://www.youtube.com/xml/feeds/videos.xml?channel_id=%s", channelID)
 
 	subscription := &models.Subscription{
-		ChannelID:   channelID,
-		TopicURL:    topicURL,
-		CallbackURL: callbackURL,
-		HubURL:      "https://pubsubhubbub.appspot.com/subscribe",
+		ChannelID:    channelID,
+		TopicURL:     topicURL,
+		CallbackURL:  callbackURL,
+		HubURL:       "https://pubsubhubbub.appspot.com/subscribe",
 		LeaseSeconds: 432000, // 5 days
-		ExpiresAt:   time.Now().Add(432000 * time.Second),
-		Status:      "pending",
+		ExpiresAt:    time.Now().Add(432000 * time.Second),
+		Status:       "pending",
 	}
 
 	// Create the subscription in the database
