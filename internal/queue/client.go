@@ -1,0 +1,111 @@
+package queue
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"ad-tracker/youtube-webhook-ingestion/internal/db/repository"
+	"ad-tracker/youtube-webhook-ingestion/internal/model"
+
+	"github.com/hibiken/asynq"
+)
+
+// Client wraps asynq client for enqueueing tasks
+type Client struct {
+	asynqClient *asynq.Client
+	jobRepo     repository.EnrichmentJobRepository
+}
+
+// NewClient creates a new queue client
+func NewClient(redisAddr string, jobRepo repository.EnrichmentJobRepository) (*Client, error) {
+	asynqClient := asynq.NewClient(asynq.RedisClientOpt{
+		Addr: redisAddr,
+	})
+
+	return &Client{
+		asynqClient: asynqClient,
+		jobRepo:     jobRepo,
+	}, nil
+}
+
+// Close closes the client connection
+func (c *Client) Close() error {
+	return c.asynqClient.Close()
+}
+
+// EnqueueVideoEnrichment enqueues a video enrichment task
+func (c *Client) EnqueueVideoEnrichment(ctx context.Context, videoID, channelID string, priority int) error {
+	// Create payload
+	payload, err := NewEnrichVideoTask(videoID, channelID, priority, map[string]interface{}{
+		"source":     "webhook",
+		"enqueued_at": time.Now().Format(time.RFC3339),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create task payload: %w", err)
+	}
+
+	// Marshal payload
+	payloadBytes, err := payload.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	// Create asynq task
+	task := asynq.NewTask(TypeEnrichVideo, payloadBytes)
+
+	// Enqueue task
+	info, err := c.asynqClient.Enqueue(task,
+		asynq.MaxRetry(3),
+		asynq.Timeout(5*time.Minute),
+		asynq.Queue("default"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to enqueue task: %w", err)
+	}
+
+	log.Printf("[Queue] Enqueued video enrichment: video_id=%s, task_id=%s", videoID, info.ID)
+
+	// Record job in database for tracking
+	job := &model.EnrichmentJob{
+		AsynqTaskID: strPtr(info.ID),
+		JobType:     TypeEnrichVideo,
+		VideoID:     videoID,
+		Status:      "pending",
+		Priority:    priority,
+		ScheduledAt: time.Now(),
+		MaxAttempts: 3,
+		Metadata: map[string]interface{}{
+			"channel_id": channelID,
+			"source":     "webhook",
+		},
+	}
+
+	if err := c.jobRepo.CreateJob(ctx, job); err != nil {
+		// Log but don't fail - the asynq task is already queued
+		log.Printf("[Queue] Warning: failed to record job in database: %v", err)
+	}
+
+	return nil
+}
+
+// EnqueueVideoEnrichmentBatch enqueues multiple video enrichment tasks
+func (c *Client) EnqueueVideoEnrichmentBatch(ctx context.Context, videoIDs []string, channelID string, priority int) error {
+	for _, videoID := range videoIDs {
+		if err := c.EnqueueVideoEnrichment(ctx, videoID, channelID, priority); err != nil {
+			log.Printf("[Queue] Failed to enqueue video %s: %v", videoID, err)
+			// Continue with other videos
+		}
+	}
+
+	log.Printf("[Queue] Enqueued %d video enrichment tasks", len(videoIDs))
+	return nil
+}
+
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
