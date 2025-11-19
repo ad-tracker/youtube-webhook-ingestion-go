@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"ad-tracker/youtube-webhook-ingestion/internal/queue"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,6 +26,10 @@ type mockProcessor struct {
 func (m *mockProcessor) ProcessEvent(ctx context.Context, rawXML string) error {
 	args := m.Called(ctx, rawXML)
 	return args.Error(0)
+}
+
+func (m *mockProcessor) SetQueueClient(client *queue.Client) {
+	// No-op for tests - queue client is optional
 }
 
 func TestWebhookHandler_ServeHTTP_MethodNotAllowed(t *testing.T) {

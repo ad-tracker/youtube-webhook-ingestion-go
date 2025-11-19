@@ -94,7 +94,7 @@ func (h *EnrichmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) e
 		if job != nil {
 			h.jobRepo.MarkJobFailed(ctx, job.ID, errMsg, nil)
 		}
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("no data returned for video %s", payload.VideoID)
 	}
 
 	// Store enrichment in database
