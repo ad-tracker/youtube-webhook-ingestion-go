@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -327,4 +329,285 @@ func ParseVideoDuration(duration string) (int, error) {
 	}
 
 	return hours*3600 + minutes*60 + seconds, nil
+}
+
+// ChannelEnrichment represents extended channel metadata from YouTube API
+type ChannelEnrichment struct {
+	ChannelID           string
+	Title               string
+	Description         string
+	CustomURL           string
+	PublishedAt         time.Time
+	Country             string
+	ViewCount           int64
+	SubscriberCount     int64
+	VideoCount          int64
+	ThumbnailDefaultURL string
+	ThumbnailMediumURL  string
+	ThumbnailHighURL    string
+	BannerImageURL      string
+	Keywords            string
+	APIResponseEtag     string
+	QuotaCost           int
+}
+
+// ResolveChannelByURL parses a YouTube URL and resolves it to channel details
+// Supports formats:
+// - https://www.youtube.com/@handle
+// - https://www.youtube.com/channel/UCxxxxxx
+// - https://www.youtube.com/c/CustomName
+// - https://www.youtube.com/user/Username
+func (c *Client) ResolveChannelByURL(ctx context.Context, urlStr string) (*ChannelEnrichment, error) {
+	// Parse the URL
+	channelID, handle, username, customURL, err := parseYouTubeURL(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse YouTube URL: %w", err)
+	}
+
+	// If we have a direct channel ID, fetch it directly
+	if channelID != "" {
+		return c.GetChannelDetails(ctx, channelID)
+	}
+
+	// If we have a handle, search by handle
+	if handle != "" {
+		return c.resolveChannelByHandle(ctx, handle)
+	}
+
+	// If we have a username, search by username
+	if username != "" {
+		return c.resolveChannelByUsername(ctx, username)
+	}
+
+	// If we have a custom URL, search by custom URL
+	if customURL != "" {
+		return c.resolveChannelByCustomURL(ctx, customURL)
+	}
+
+	return nil, fmt.Errorf("unable to extract channel identifier from URL")
+}
+
+// GetChannelDetails fetches comprehensive channel metadata by channel ID
+func (c *Client) GetChannelDetails(ctx context.Context, channelID string) (*ChannelEnrichment, error) {
+	// Request all available parts for comprehensive data
+	parts := []string{
+		"snippet",
+		"contentDetails",
+		"statistics",
+		"brandingSettings",
+		"status",
+		"topicDetails",
+	}
+
+	call := c.service.Channels.List(parts).Id(channelID).Context(ctx)
+	response, err := call.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch channel from YouTube API: %w", err)
+	}
+
+	if len(response.Items) == 0 {
+		return nil, fmt.Errorf("channel not found: %s", channelID)
+	}
+
+	channel := response.Items[0]
+
+	// Quota cost: channels.list with 6 parts ≈ 5-6 units
+	quotaCost := 6
+
+	enrichment := &ChannelEnrichment{
+		ChannelID:       channel.Id,
+		APIResponseEtag: response.Etag,
+		QuotaCost:       quotaCost,
+	}
+
+	// Map snippet data
+	if channel.Snippet != nil {
+		enrichment.Title = channel.Snippet.Title
+		enrichment.Description = channel.Snippet.Description
+		enrichment.CustomURL = channel.Snippet.CustomUrl
+		enrichment.Country = channel.Snippet.Country
+
+		if channel.Snippet.PublishedAt != "" {
+			if t, err := parseYouTubeTime(channel.Snippet.PublishedAt); err == nil {
+				enrichment.PublishedAt = t
+			}
+		}
+
+		// Map thumbnails
+		if channel.Snippet.Thumbnails != nil {
+			if channel.Snippet.Thumbnails.Default != nil {
+				enrichment.ThumbnailDefaultURL = channel.Snippet.Thumbnails.Default.Url
+			}
+			if channel.Snippet.Thumbnails.Medium != nil {
+				enrichment.ThumbnailMediumURL = channel.Snippet.Thumbnails.Medium.Url
+			}
+			if channel.Snippet.Thumbnails.High != nil {
+				enrichment.ThumbnailHighURL = channel.Snippet.Thumbnails.High.Url
+			}
+		}
+	}
+
+	// Map statistics
+	if channel.Statistics != nil {
+		enrichment.ViewCount = int64(channel.Statistics.ViewCount)
+		enrichment.SubscriberCount = int64(channel.Statistics.SubscriberCount)
+		enrichment.VideoCount = int64(channel.Statistics.VideoCount)
+	}
+
+	// Map branding settings
+	if channel.BrandingSettings != nil && channel.BrandingSettings.Channel != nil {
+		enrichment.Keywords = channel.BrandingSettings.Channel.Keywords
+	}
+
+	// Map banner image
+	if channel.BrandingSettings != nil && channel.BrandingSettings.Image != nil {
+		enrichment.BannerImageURL = channel.BrandingSettings.Image.BannerExternalUrl
+	}
+
+	return enrichment, nil
+}
+
+// resolveChannelByHandle resolves a @handle to channel details
+func (c *Client) resolveChannelByHandle(ctx context.Context, handle string) (*ChannelEnrichment, error) {
+	// Remove @ prefix if present
+	handle = strings.TrimPrefix(handle, "@")
+
+	// YouTube API Search for channels by handle
+	// Note: The forHandle parameter is the most reliable way to search by handle
+	parts := []string{
+		"snippet",
+		"contentDetails",
+		"statistics",
+		"brandingSettings",
+	}
+
+	call := c.service.Channels.List(parts).ForHandle(handle).Context(ctx)
+	response, err := call.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to search channel by handle '@%s': %w", handle, err)
+	}
+
+	if len(response.Items) == 0 {
+		return nil, fmt.Errorf("channel not found for handle: @%s", handle)
+	}
+
+	// Use the first result and fetch full details
+	channelID := response.Items[0].Id
+	return c.GetChannelDetails(ctx, channelID)
+}
+
+// resolveChannelByUsername resolves a legacy username to channel details
+func (c *Client) resolveChannelByUsername(ctx context.Context, username string) (*ChannelEnrichment, error) {
+	// YouTube API Search for channels by username (legacy)
+	parts := []string{
+		"snippet",
+		"contentDetails",
+		"statistics",
+		"brandingSettings",
+	}
+
+	call := c.service.Channels.List(parts).ForUsername(username).Context(ctx)
+	response, err := call.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to search channel by username '%s': %w", username, err)
+	}
+
+	if len(response.Items) == 0 {
+		return nil, fmt.Errorf("channel not found for username: %s", username)
+	}
+
+	channelID := response.Items[0].Id
+	return c.GetChannelDetails(ctx, channelID)
+}
+
+// resolveChannelByCustomURL searches for a channel by custom URL
+func (c *Client) resolveChannelByCustomURL(ctx context.Context, customURL string) (*ChannelEnrichment, error) {
+	// For custom URLs, we need to use the Search API
+	// This is less reliable but necessary for /c/ URLs
+	call := c.service.Search.List([]string{"snippet"}).
+		Q(customURL).
+		Type("channel").
+		MaxResults(5).
+		Context(ctx)
+
+	response, err := call.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to search channel by custom URL '%s': %w", customURL, err)
+	}
+
+	if len(response.Items) == 0 {
+		return nil, fmt.Errorf("channel not found for custom URL: %s", customURL)
+	}
+
+	// Take the first result (best match)
+	channelID := response.Items[0].Id.ChannelId
+	if channelID == "" {
+		return nil, fmt.Errorf("search result did not contain a channel ID")
+	}
+
+	return c.GetChannelDetails(ctx, channelID)
+}
+
+// parseYouTubeURL extracts channel identifiers from various YouTube URL formats
+// Returns: (channelID, handle, username, customURL, error)
+func parseYouTubeURL(urlStr string) (string, string, string, string, error) {
+	// Clean up the URL
+	urlStr = strings.TrimSpace(urlStr)
+
+	// Add https:// if missing
+	if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
+		urlStr = "https://" + urlStr
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return "", "", "", "", fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Check if it's a YouTube domain
+	host := strings.ToLower(parsedURL.Host)
+	if !strings.Contains(host, "youtube.com") && !strings.Contains(host, "youtu.be") {
+		return "", "", "", "", fmt.Errorf("not a YouTube URL: %s", host)
+	}
+
+	path := parsedURL.Path
+
+	// Pattern 1: /@handle
+	if strings.HasPrefix(path, "/@") {
+		handle := strings.TrimPrefix(path, "/")
+		handle = strings.TrimPrefix(handle, "@")
+		// Remove any trailing path segments
+		if idx := strings.Index(handle, "/"); idx != -1 {
+			handle = handle[:idx]
+		}
+		return "", handle, "", "", nil
+	}
+
+	// Pattern 2: /channel/UCxxxxxx
+	channelIDRegex := regexp.MustCompile(`^/channel/(UC[a-zA-Z0-9_-]{22})`)
+	if matches := channelIDRegex.FindStringSubmatch(path); len(matches) > 1 {
+		return matches[1], "", "", "", nil
+	}
+
+	// Pattern 3: /c/CustomName
+	if strings.HasPrefix(path, "/c/") {
+		customName := strings.TrimPrefix(path, "/c/")
+		// Remove any trailing path segments
+		if idx := strings.Index(customName, "/"); idx != -1 {
+			customName = customName[:idx]
+		}
+		return "", "", "", customName, nil
+	}
+
+	// Pattern 4: /user/Username
+	if strings.HasPrefix(path, "/user/") {
+		username := strings.TrimPrefix(path, "/user/")
+		// Remove any trailing path segments
+		if idx := strings.Index(username, "/"); idx != -1 {
+			username = username[:idx]
+		}
+		return "", "", username, "", nil
+	}
+
+	return "", "", "", "", fmt.Errorf("unsupported YouTube URL format: %s", urlStr)
 }

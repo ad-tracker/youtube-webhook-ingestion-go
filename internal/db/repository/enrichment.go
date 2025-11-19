@@ -355,3 +355,233 @@ func (r *enrichmentRepository) GetEnrichedVideoCount(ctx context.Context) (int64
 	}
 	return count, nil
 }
+
+// ChannelEnrichmentRepository defines operations for managing channel enrichments
+type ChannelEnrichmentRepository interface {
+	// Create stores a new channel enrichment
+	Create(ctx context.Context, enrichment *model.ChannelEnrichment) error
+
+	// GetLatest retrieves the most recent enrichment for a channel
+	GetLatest(ctx context.Context, channelID string) (*model.ChannelEnrichment, error)
+
+	// GetHistory retrieves all enrichments for a channel
+	GetHistory(ctx context.Context, channelID string, limit int) ([]*model.ChannelEnrichment, error)
+}
+
+type channelEnrichmentRepository struct {
+	pool *pgxpool.Pool
+}
+
+// NewChannelEnrichmentRepository creates a new ChannelEnrichmentRepository
+func NewChannelEnrichmentRepository(pool *pgxpool.Pool) ChannelEnrichmentRepository {
+	return &channelEnrichmentRepository{pool: pool}
+}
+
+func (r *channelEnrichmentRepository) Create(ctx context.Context, enrichment *model.ChannelEnrichment) error {
+	query := `
+		INSERT INTO channel_api_enrichments (
+			channel_id, description, custom_url, country, published_at,
+			thumbnail_default_url, thumbnail_medium_url, thumbnail_high_url,
+			view_count, subscriber_count, video_count, hidden_subscriber_count,
+			banner_image_url, keywords,
+			related_playlists_likes, related_playlists_uploads, related_playlists_favorites,
+			topic_categories,
+			privacy_status, is_linked, long_uploads_status, made_for_kids,
+			enriched_at, api_response_etag, quota_cost, api_parts_requested, raw_api_response,
+			created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5,
+			$6, $7, $8,
+			$9, $10, $11, $12,
+			$13, $14,
+			$15, $16, $17,
+			$18,
+			$19, $20, $21, $22,
+			$23, $24, $25, $26, $27,
+			$28, $29
+		)
+		RETURNING id, enriched_at, created_at, updated_at
+	`
+
+	// Convert arrays and maps to JSON
+	topicCategoriesJSON, _ := json.Marshal(enrichment.TopicCategories)
+	apiPartsJSON, _ := json.Marshal(enrichment.APIPartsRequested)
+	rawAPIResponseJSON, _ := json.Marshal(enrichment.RawAPIResponse)
+
+	now := time.Now()
+	enrichedAt := now
+	if !enrichment.EnrichedAt.IsZero() {
+		enrichedAt = enrichment.EnrichedAt
+	}
+
+	err := r.pool.QueryRow(ctx, query,
+		enrichment.ChannelID,
+		enrichment.Description,
+		enrichment.CustomURL,
+		enrichment.Country,
+		enrichment.PublishedAt,
+		// Thumbnails
+		enrichment.ThumbnailDefaultURL,
+		enrichment.ThumbnailMediumURL,
+		enrichment.ThumbnailHighURL,
+		// Statistics
+		enrichment.ViewCount,
+		enrichment.SubscriberCount,
+		enrichment.VideoCount,
+		enrichment.HiddenSubscriberCount,
+		// Branding
+		enrichment.BannerImageURL,
+		enrichment.Keywords,
+		// Playlists
+		enrichment.RelatedPlaylistsLikes,
+		enrichment.RelatedPlaylistsUploads,
+		enrichment.RelatedPlaylistsFavorites,
+		// Topics
+		topicCategoriesJSON,
+		// Status
+		enrichment.PrivacyStatus,
+		enrichment.IsLinked,
+		enrichment.LongUploadsStatus,
+		enrichment.MadeForKids,
+		// API metadata
+		enrichedAt,
+		enrichment.APIResponseEtag,
+		enrichment.QuotaCost,
+		apiPartsJSON,
+		rawAPIResponseJSON,
+		// Timestamps
+		now, now,
+	).Scan(
+		&enrichment.ID,
+		&enrichment.EnrichedAt,
+		&enrichment.CreatedAt,
+		&enrichment.UpdatedAt,
+	)
+
+	if err != nil {
+		return db.WrapError(err, "create channel enrichment")
+	}
+
+	return nil
+}
+
+func (r *channelEnrichmentRepository) GetLatest(ctx context.Context, channelID string) (*model.ChannelEnrichment, error) {
+	query := `
+		SELECT
+			id, channel_id, description, custom_url, country, published_at,
+			thumbnail_default_url, thumbnail_medium_url, thumbnail_high_url,
+			view_count, subscriber_count, video_count, hidden_subscriber_count,
+			banner_image_url, keywords,
+			related_playlists_likes, related_playlists_uploads, related_playlists_favorites,
+			topic_categories,
+			privacy_status, is_linked, long_uploads_status, made_for_kids,
+			enriched_at, api_response_etag, quota_cost, api_parts_requested, raw_api_response,
+			created_at, updated_at
+		FROM channel_api_enrichments
+		WHERE channel_id = $1
+		ORDER BY enriched_at DESC
+		LIMIT 1
+	`
+
+	enrichment := &model.ChannelEnrichment{}
+	var topicCategoriesJSON, apiPartsJSON, rawAPIResponseJSON []byte
+
+	err := r.pool.QueryRow(ctx, query, channelID).Scan(
+		&enrichment.ID,
+		&enrichment.ChannelID,
+		&enrichment.Description,
+		&enrichment.CustomURL,
+		&enrichment.Country,
+		&enrichment.PublishedAt,
+		// Thumbnails
+		&enrichment.ThumbnailDefaultURL,
+		&enrichment.ThumbnailMediumURL,
+		&enrichment.ThumbnailHighURL,
+		// Statistics
+		&enrichment.ViewCount,
+		&enrichment.SubscriberCount,
+		&enrichment.VideoCount,
+		&enrichment.HiddenSubscriberCount,
+		// Branding
+		&enrichment.BannerImageURL,
+		&enrichment.Keywords,
+		// Playlists
+		&enrichment.RelatedPlaylistsLikes,
+		&enrichment.RelatedPlaylistsUploads,
+		&enrichment.RelatedPlaylistsFavorites,
+		// Topics
+		&topicCategoriesJSON,
+		// Status
+		&enrichment.PrivacyStatus,
+		&enrichment.IsLinked,
+		&enrichment.LongUploadsStatus,
+		&enrichment.MadeForKids,
+		// API metadata
+		&enrichment.EnrichedAt,
+		&enrichment.APIResponseEtag,
+		&enrichment.QuotaCost,
+		&apiPartsJSON,
+		&rawAPIResponseJSON,
+		// Timestamps
+		&enrichment.CreatedAt,
+		&enrichment.UpdatedAt,
+	)
+
+	if err == pgx.ErrNoRows {
+		return nil, db.ErrNotFound
+	}
+	if err != nil {
+		return nil, db.WrapError(err, "get latest channel enrichment")
+	}
+
+	// Unmarshal JSON fields
+	json.Unmarshal(topicCategoriesJSON, &enrichment.TopicCategories)
+	json.Unmarshal(apiPartsJSON, &enrichment.APIPartsRequested)
+	json.Unmarshal(rawAPIResponseJSON, &enrichment.RawAPIResponse)
+
+	return enrichment, nil
+}
+
+func (r *channelEnrichmentRepository) GetHistory(ctx context.Context, channelID string, limit int) ([]*model.ChannelEnrichment, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+
+	query := `
+		SELECT
+			id, channel_id, enriched_at, quota_cost,
+			subscriber_count, video_count, view_count,
+			created_at
+		FROM channel_api_enrichments
+		WHERE channel_id = $1
+		ORDER BY enriched_at DESC
+		LIMIT $2
+	`
+
+	rows, err := r.pool.Query(ctx, query, channelID, limit)
+	if err != nil {
+		return nil, db.WrapError(err, "get channel enrichment history")
+	}
+	defer rows.Close()
+
+	var enrichments []*model.ChannelEnrichment
+	for rows.Next() {
+		e := &model.ChannelEnrichment{}
+		err := rows.Scan(
+			&e.ID,
+			&e.ChannelID,
+			&e.EnrichedAt,
+			&e.QuotaCost,
+			&e.SubscriberCount,
+			&e.VideoCount,
+			&e.ViewCount,
+			&e.CreatedAt,
+		)
+		if err != nil {
+			return nil, db.WrapError(err, "scan channel enrichment history")
+		}
+		enrichments = append(enrichments, e)
+	}
+
+	return enrichments, nil
+}

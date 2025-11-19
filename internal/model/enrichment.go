@@ -134,3 +134,57 @@ type QuotaInfo struct {
 	QuotaRemaining  int `json:"quota_remaining"`
 	OperationsCount int `json:"operations_count"`
 }
+
+// ChannelEnrichment represents comprehensive YouTube API v3 data for a channel
+type ChannelEnrichment struct {
+	ID        int64  `json:"id"`
+	ChannelID string `json:"channel_id"`
+
+	// Basic metadata
+	Description *string    `json:"description"`
+	CustomURL   *string    `json:"custom_url"` // Channel's custom URL
+	Country     *string    `json:"country"`    // ISO 3166-1 alpha-2 country code
+	PublishedAt *time.Time `json:"published_at"`
+
+	// Thumbnails
+	ThumbnailDefaultURL *string `json:"thumbnail_default_url"`
+	ThumbnailMediumURL  *string `json:"thumbnail_medium_url"`
+	ThumbnailHighURL    *string `json:"thumbnail_high_url"`
+
+	// Statistics
+	ViewCount              *int64 `json:"view_count"`
+	SubscriberCount        *int64 `json:"subscriber_count"`
+	VideoCount             *int64 `json:"video_count"`
+	HiddenSubscriberCount  *bool  `json:"hidden_subscriber_count"`
+
+	// Branding
+	BannerImageURL *string `json:"banner_image_url"`
+	Keywords       *string `json:"keywords"`
+
+	// Content details
+	RelatedPlaylistsLikes    *string `json:"related_playlists_likes"`
+	RelatedPlaylistsUploads  *string `json:"related_playlists_uploads"`
+	RelatedPlaylistsFavorites *string `json:"related_playlists_favorites"`
+
+	// Topic details
+	TopicCategories []string `json:"topic_categories"`
+
+	// Status
+	PrivacyStatus      *string `json:"privacy_status"`
+	IsLinked           *bool   `json:"is_linked"`
+	LongUploadsStatus  *string `json:"long_uploads_status"`
+	MadeForKids        *bool   `json:"made_for_kids"`
+
+	// API metadata
+	EnrichedAt        time.Time `json:"enriched_at"`
+	APIResponseEtag   *string   `json:"api_response_etag"`
+	QuotaCost         int       `json:"quota_cost"`
+	APIPartsRequested []string  `json:"api_parts_requested"`
+
+	// Raw API response
+	RawAPIResponse map[string]interface{} `json:"raw_api_response"`
+
+	// Timestamps
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
