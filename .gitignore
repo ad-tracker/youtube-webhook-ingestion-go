@@ -47,3 +47,5 @@ QUICK_REFERENCE.md
 # Build artifacts
 /server
 /renewer
+/enricher
+/migrate
