@@ -53,6 +53,7 @@ func main() {
 	channelRepo := repository.NewChannelRepository(pool)
 	videoUpdateRepo := repository.NewVideoUpdateRepository(pool)
 	subscriptionRepo := repository.NewSubscriptionRepository(pool)
+	videoEnrichmentRepo := repository.NewEnrichmentRepository(pool)
 	channelEnrichmentRepo := repository.NewChannelEnrichmentRepository(pool)
 	quotaRepo := repository.NewQuotaRepository(pool)
 
@@ -118,6 +119,7 @@ func main() {
 	videoHandler := handler.NewVideoHandler(videoRepo, logger)
 	videoUpdateHandler := handler.NewVideoUpdateHandler(videoUpdateRepo, logger)
 	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, logger)
+	enrichmentHandler := handler.NewEnrichmentHandler(videoEnrichmentRepo, channelEnrichmentRepo, logger)
 
 	// Channel from URL handler (only if YouTube API is available)
 	var channelFromURLHandler *handler.ChannelFromURLHandler
@@ -147,6 +149,7 @@ func main() {
 	mux.Handle("/api/v1/video-updates/", authMiddleware.Middleware(videoUpdateHandler))
 	mux.Handle("/api/v1/subscriptions", authMiddleware.Middleware(subscriptionCRUDHandler))
 	mux.Handle("/api/v1/subscriptions/", authMiddleware.Middleware(subscriptionCRUDHandler))
+	mux.Handle("/api/v1/enrichments/", authMiddleware.Middleware(enrichmentHandler))
 
 	mux.HandleFunc("/health", handleHealth(pool))
 
