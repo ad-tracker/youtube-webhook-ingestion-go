@@ -1,5 +1,42 @@
 # API Authentication
 
+## Quick Start (5 minutes)
+
+### 1. Generate an API Key
+
+```bash
+# Option 1: Using openssl
+API_KEY=$(openssl rand -base64 32)
+echo "Your API Key: $API_KEY"
+
+# Option 2: Using Python
+python3 -c "import secrets; print('sk_live_' + secrets.token_urlsafe(32)[:40])"
+```
+
+### 2. Configure the Server
+
+```bash
+# Set the API key
+export API_KEYS="your-generated-api-key-here"
+
+# Set other required variables
+export DATABASE_URL="postgres://user:password@localhost:5432/youtube_webhooks?sslmode=disable"
+
+# Start the server
+./server
+```
+
+### 3. Test It
+
+```bash
+# Test without API key (should fail with 401)
+curl -X GET "http://localhost:8080/api/v1/subscriptions?channel_id=UCxxxxxxxxxxxxxxxxxxxxxx"
+
+# Test with API key (should succeed)
+curl -X GET "http://localhost:8080/api/v1/subscriptions?channel_id=UCxxxxxxxxxxxxxxxxxxxxxx" \
+  -H "X-API-Key: your-generated-api-key-here"
+```
+
 ## Overview
 
 The YouTube Webhook Ingestion service uses API key authentication to protect subscription management endpoints. This ensures that only authorized clients can create and manage YouTube channel subscriptions.
@@ -368,9 +405,34 @@ If you're adding authentication to an existing deployment:
 4. **Monitor logs** for unauthorized requests
 5. **Fix any client misconfigurations**
 
+## Quick Commands
+
+```bash
+# Generate a key
+openssl rand -base64 32
+
+# Set environment and start server
+export API_KEYS="$(openssl rand -base64 32)"
+export DATABASE_URL="postgres://localhost/youtube_webhooks"
+./server
+
+# Test endpoint
+curl -H "X-API-Key: $API_KEYS" http://localhost:8080/api/v1/subscriptions?channel_id=test
+```
+
+## Production Checklist
+
+- [ ] Generate strong API keys (32+ characters)
+- [ ] Use HTTPS for all requests
+- [ ] Store API keys in environment variables or secret manager
+- [ ] Set up monitoring for 401 errors
+- [ ] Document which keys are used where
+- [ ] Plan key rotation schedule
+- [ ] Test all clients before deploying
+
 ## Reference
 
 - Middleware implementation: `internal/middleware/auth.go`
 - Middleware tests: `internal/middleware/auth_test.go`
 - Server configuration: `cmd/server/main.go`
-- API documentation: `docs/SUBSCRIPTION_API.md`
+- API documentation: [API.md](API.md)

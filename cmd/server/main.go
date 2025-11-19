@@ -29,16 +29,13 @@ const (
 )
 
 func main() {
-	// Initialize structured logger
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 	slog.SetDefault(logger)
 
-	// Load configuration from environment
 	config := loadConfig()
 
-	// Initialize database connection
 	ctx := context.Background()
 	pool, err := initDatabase(ctx, config.DatabaseURL)
 	if err != nil {
@@ -51,7 +48,6 @@ func main() {
 		"max_conns", pool.Config().MaxConns,
 	)
 
-	// Initialize repositories
 	webhookEventRepo := repository.NewWebhookEventRepository(pool)
 	videoRepo := repository.NewVideoRepository(pool)
 	channelRepo := repository.NewChannelRepository(pool)
@@ -60,7 +56,6 @@ func main() {
 	channelEnrichmentRepo := repository.NewChannelEnrichmentRepository(pool)
 	quotaRepo := repository.NewQuotaRepository(pool)
 
-	// Initialize event processor
 	processor := service.NewEventProcessor(
 		pool,
 		webhookEventRepo,
@@ -84,10 +79,9 @@ func main() {
 		}
 	}
 
-	// Initialize PubSubHub service
 	pubSubHubService := service.NewPubSubHubService(&http.Client{}, logger)
 
-	// Initialize YouTube API client (optional - only if API key is provided)
+	// YouTube API client (optional - only if API key is provided)
 	var youtubeClient *youtube.Client
 	var quotaManager *quota.Manager
 	var channelResolverService *service.ChannelResolverService
@@ -100,10 +94,8 @@ func main() {
 				"error", err,
 			)
 		} else {
-			// Initialize quota manager
 			quotaManager = quota.NewManager(quotaRepo, 10000, 90)
 
-			// Initialize channel resolver service
 			channelResolverService = service.NewChannelResolverService(
 				youtubeClient,
 				channelRepo,
@@ -119,10 +111,8 @@ func main() {
 		logger.Info("YouTube API key not configured (YOUTUBE_API_KEY), URL-based channel addition will not be available")
 	}
 
-	// Initialize handlers
 	webhookHandler := handler.NewWebhookHandler(processor, config.WebhookSecret, logger)
 
-	// CRUD handlers
 	webhookEventHandler := handler.NewWebhookEventHandler(webhookEventRepo, logger)
 	channelHandler := handler.NewChannelHandler(channelRepo, logger)
 	videoHandler := handler.NewVideoHandler(videoRepo, logger)
@@ -135,16 +125,12 @@ func main() {
 		channelFromURLHandler = handler.NewChannelFromURLHandler(channelResolverService, logger)
 	}
 
-	// Initialize authentication middleware
 	authMiddleware := middleware.NewAPIKeyAuth(config.APIKeys, logger)
 
-	// Set up HTTP server
 	mux := http.NewServeMux()
 
-	// Public webhook endpoint (no authentication)
 	mux.Handle(config.WebhookPath, webhookHandler)
 
-	// Protected CRUD API endpoints (with authentication)
 	mux.Handle("/api/v1/webhook-events", authMiddleware.Middleware(webhookEventHandler))
 	mux.Handle("/api/v1/webhook-events/", authMiddleware.Middleware(webhookEventHandler))
 	mux.Handle("/api/v1/channels", authMiddleware.Middleware(channelHandler))
@@ -162,7 +148,6 @@ func main() {
 	mux.Handle("/api/v1/subscriptions", authMiddleware.Middleware(subscriptionCRUDHandler))
 	mux.Handle("/api/v1/subscriptions/", authMiddleware.Middleware(subscriptionCRUDHandler))
 
-	// Health check endpoint (public)
 	mux.HandleFunc("/health", handleHealth(pool))
 
 	server := &http.Server{
@@ -173,7 +158,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Start server in a goroutine
 	serverErrors := make(chan error, 1)
 	go func() {
 		logger.Info("server starting",
@@ -183,7 +167,6 @@ func main() {
 		serverErrors <- server.ListenAndServe()
 	}()
 
-	// Wait for interrupt signal or server error
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
@@ -194,7 +177,6 @@ func main() {
 	case sig := <-shutdown:
 		logger.Info("shutdown signal received", "signal", sig)
 
-		// Give outstanding requests time to complete
 		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 
