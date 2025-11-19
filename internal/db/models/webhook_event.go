@@ -8,16 +8,16 @@ import (
 // WebhookEvent represents a raw webhook notification event from YouTube PubSubHubbub.
 // This table is immutable - events can only be created and marked as processed.
 type WebhookEvent struct {
-	ID              int64          `db:"id"`
-	RawXML          string         `db:"raw_xml"`
-	ContentHash     string         `db:"content_hash"`
-	ReceivedAt      time.Time      `db:"received_at"`
-	Processed       bool           `db:"processed"`
-	ProcessedAt     sql.NullTime   `db:"processed_at"`
-	ProcessingError sql.NullString `db:"processing_error"`
-	VideoID         sql.NullString `db:"video_id"`
-	ChannelID       sql.NullString `db:"channel_id"`
-	CreatedAt       time.Time      `db:"created_at"`
+	ID              int64          `db:"id" json:"id"`
+	RawXML          string         `db:"raw_xml" json:"raw_xml"`
+	ContentHash     string         `db:"content_hash" json:"content_hash"`
+	ReceivedAt      time.Time      `db:"received_at" json:"received_at"`
+	Processed       bool           `db:"processed" json:"processed"`
+	ProcessedAt     sql.NullTime   `db:"processed_at" json:"processed_at,omitempty"`
+	ProcessingError sql.NullString `db:"processing_error" json:"processing_error,omitempty"`
+	VideoID         sql.NullString `db:"video_id" json:"video_id,omitempty"`
+	ChannelID       sql.NullString `db:"channel_id" json:"channel_id,omitempty"`
+	CreatedAt       time.Time      `db:"created_at" json:"created_at"`
 }
 
 // NewWebhookEvent creates a new WebhookEvent with the given raw XML and content hash.

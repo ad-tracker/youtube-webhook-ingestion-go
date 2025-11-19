@@ -4,15 +4,15 @@ import "time"
 
 // Video represents a YouTube video that we're tracking.
 type Video struct {
-	VideoID       string    `db:"video_id"`
-	ChannelID     string    `db:"channel_id"`
-	Title         string    `db:"title"`
-	VideoURL      string    `db:"video_url"`
-	PublishedAt   time.Time `db:"published_at"`
-	FirstSeenAt   time.Time `db:"first_seen_at"`
-	LastUpdatedAt time.Time `db:"last_updated_at"`
-	CreatedAt     time.Time `db:"created_at"`
-	UpdatedAt     time.Time `db:"updated_at"`
+	VideoID       string    `db:"video_id" json:"video_id"`
+	ChannelID     string    `db:"channel_id" json:"channel_id"`
+	Title         string    `db:"title" json:"title"`
+	VideoURL      string    `db:"video_url" json:"video_url"`
+	PublishedAt   time.Time `db:"published_at" json:"published_at"`
+	FirstSeenAt   time.Time `db:"first_seen_at" json:"first_seen_at"`
+	LastUpdatedAt time.Time `db:"last_updated_at" json:"last_updated_at"`
+	CreatedAt     time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt     time.Time `db:"updated_at" json:"updated_at"`
 }
 
 // NewVideo creates a new Video with the given information.

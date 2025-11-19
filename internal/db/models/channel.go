@@ -4,13 +4,13 @@ import "time"
 
 // Channel represents a YouTube channel that we're tracking.
 type Channel struct {
-	ChannelID     string    `db:"channel_id"`
-	Title         string    `db:"title"`
-	ChannelURL    string    `db:"channel_url"`
-	FirstSeenAt   time.Time `db:"first_seen_at"`
-	LastUpdatedAt time.Time `db:"last_updated_at"`
-	CreatedAt     time.Time `db:"created_at"`
-	UpdatedAt     time.Time `db:"updated_at"`
+	ChannelID     string    `db:"channel_id" json:"channel_id"`
+	Title         string    `db:"title" json:"title"`
+	ChannelURL    string    `db:"channel_url" json:"channel_url"`
+	FirstSeenAt   time.Time `db:"first_seen_at" json:"first_seen_at"`
+	LastUpdatedAt time.Time `db:"last_updated_at" json:"last_updated_at"`
+	CreatedAt     time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt     time.Time `db:"updated_at" json:"updated_at"`
 }
 
 // NewChannel creates a new Channel with the given information.
