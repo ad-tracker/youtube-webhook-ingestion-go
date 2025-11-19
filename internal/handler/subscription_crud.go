@@ -66,6 +66,16 @@ func (h *SubscriptionCRUDHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Handle /renew-all endpoint
+	if path == "/renew-all" {
+		if r.Method == http.MethodPost {
+			h.handleRenewAll(w, r)
+			return
+		}
+		sendError(w, http.StatusMethodNotAllowed, "method not allowed", "", nil)
+		return
+	}
+
 	if strings.HasPrefix(path, "/") {
 		idStr := strings.TrimPrefix(path, "/")
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -108,19 +118,14 @@ func (h *SubscriptionCRUDHandler) handleCreate(w http.ResponseWriter, r *http.Re
 		req.LeaseSeconds = 432000
 	}
 
-	secret := req.Secret
-	if (secret == nil || *secret == "") && h.webhookSecret != "" {
-		secret = &h.webhookSecret
-	}
-
-	sub := models.NewSubscription(req.ChannelID, req.CallbackURL, req.LeaseSeconds, secret)
+	sub := models.NewSubscription(req.ChannelID, req.CallbackURL, req.LeaseSeconds)
 
 	hubReq := &service.SubscribeRequest{
 		HubURL:       sub.HubURL,
 		TopicURL:     sub.TopicURL,
 		CallbackURL:  sub.CallbackURL,
 		LeaseSeconds: sub.LeaseSeconds,
-		Secret:       sub.Secret,
+		Secret:       &h.webhookSecret,
 	}
 
 	h.logger.Info("attempting to subscribe to PubSubHub",
@@ -344,4 +349,123 @@ func (h *SubscriptionCRUDHandler) validateCreateRequest(req *CreateSubscriptionR
 	}
 
 	return nil
+}
+
+// handleRenewAll forces renewal of all active subscriptions.
+func (h *SubscriptionCRUDHandler) handleRenewAll(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("force renewal of all subscriptions requested")
+
+	// Get all active subscriptions
+	filters := &repository.SubscriptionFilters{
+		Status: models.StatusActive,
+		Limit:  1000, // Process up to 1000 at a time
+	}
+
+	subscriptions, total, err := h.repo.List(r.Context(), filters)
+	if err != nil {
+		h.logger.Error("failed to list subscriptions for renewal", "error", err)
+		sendError(w, http.StatusInternalServerError, "internal server error", "failed to list subscriptions", nil)
+		return
+	}
+
+	h.logger.Info("renewing subscriptions", "count", len(subscriptions), "total_active", total)
+
+	// Track results
+	type renewalResult struct {
+		SubscriptionID int64  `json:"subscription_id"`
+		ChannelID      string `json:"channel_id"`
+		Success        bool   `json:"success"`
+		Error          string `json:"error,omitempty"`
+	}
+
+	results := make([]renewalResult, 0, len(subscriptions))
+	successCount := 0
+	failureCount := 0
+
+	// Renew each subscription
+	for _, sub := range subscriptions {
+		result := renewalResult{
+			SubscriptionID: sub.ID,
+			ChannelID:      sub.ChannelID,
+		}
+
+		// Create subscription request
+		hubReq := &service.SubscribeRequest{
+			HubURL:       sub.HubURL,
+			TopicURL:     sub.TopicURL,
+			CallbackURL:  sub.CallbackURL,
+			LeaseSeconds: sub.LeaseSeconds,
+			Secret:       &h.webhookSecret,
+		}
+
+		// Subscribe via PubSubHub
+		hubResp, err := h.hubService.Subscribe(r.Context(), hubReq)
+		if err != nil {
+			h.logger.Error("failed to renew subscription",
+				"subscription_id", sub.ID,
+				"channel_id", sub.ChannelID,
+				"error", err,
+			)
+			result.Error = err.Error()
+			failureCount++
+
+			// Mark as failed
+			sub.MarkFailed()
+			if updateErr := h.repo.Update(r.Context(), sub); updateErr != nil {
+				h.logger.Error("failed to mark subscription as failed",
+					"subscription_id", sub.ID,
+					"error", updateErr,
+				)
+			}
+		} else {
+			// Update subscription based on response
+			if hubResp.Accepted {
+				sub.MarkActive()
+				sub.UpdateExpiry(sub.LeaseSeconds)
+				result.Success = true
+				successCount++
+
+				h.logger.Info("successfully renewed subscription",
+					"subscription_id", sub.ID,
+					"channel_id", sub.ChannelID,
+					"new_expires_at", sub.ExpiresAt,
+				)
+			} else {
+				sub.MarkFailed()
+				result.Error = "hub rejected subscription"
+				failureCount++
+			}
+
+			// Save updated subscription
+			if updateErr := h.repo.Update(r.Context(), sub); updateErr != nil {
+				h.logger.Error("failed to update subscription",
+					"subscription_id", sub.ID,
+					"error", updateErr,
+				)
+				result.Error = fmt.Sprintf("update failed: %v", updateErr)
+				if result.Success {
+					successCount--
+					failureCount++
+					result.Success = false
+				}
+			}
+		}
+
+		results = append(results, result)
+	}
+
+	h.logger.Info("renewal completed",
+		"total", len(subscriptions),
+		"successful", successCount,
+		"failed", failureCount,
+	)
+
+	response := map[string]interface{}{
+		"total":      len(subscriptions),
+		"successful": successCount,
+		"failed":     failureCount,
+		"results":    results,
+	}
+
+	sendJSON(w, http.StatusOK, response)
 }

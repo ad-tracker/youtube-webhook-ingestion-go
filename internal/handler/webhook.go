@@ -20,8 +20,8 @@ type WebhookHandler struct {
 	logger    *slog.Logger
 }
 
-// NewWebhookHandler creates a new webhook handler with the given processor and optional secret.
-// If secret is empty, HMAC signature verification will be skipped.
+// NewWebhookHandler creates a new webhook handler with the given processor and secret.
+// The secret is required and used for HMAC signature verification of all webhook notifications.
 func NewWebhookHandler(processor service.EventProcessor, secret string, logger *slog.Logger) *WebhookHandler {
 	if logger == nil {
 		logger = slog.Default()
@@ -79,13 +79,11 @@ func (h *WebhookHandler) handleNotification(w http.ResponseWriter, r *http.Reque
 	}
 	defer r.Body.Close()
 
-	// Verify HMAC signature if secret is configured
-	if h.secret != "" {
-		if err := h.verifySignature(r, body); err != nil {
-			h.logger.Warn("signature verification failed", "error", err)
-			http.Error(w, "Signature verification failed", http.StatusUnauthorized)
-			return
-		}
+	// Verify HMAC signature (always required)
+	if err := h.verifySignature(r, body); err != nil {
+		h.logger.Warn("signature verification failed", "error", err)
+		http.Error(w, "Signature verification failed", http.StatusUnauthorized)
+		return
 	}
 
 	// Process the event

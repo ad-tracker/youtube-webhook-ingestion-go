@@ -82,7 +82,8 @@ func TestWebhookHandler_HandleNotification_Success(t *testing.T) {
 	t.Parallel()
 
 	processor := new(mockProcessor)
-	handler := NewWebhookHandler(processor, "", nil)
+	secret := "test-secret"
+	handler := NewWebhookHandler(processor, secret, nil)
 
 	atomXML := `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
@@ -95,9 +96,15 @@ func TestWebhookHandler_HandleNotification_Success(t *testing.T) {
   </entry>
 </feed>`
 
+	// Compute valid signature
+	mac := hmac.New(sha1.New, []byte(secret))
+	mac.Write([]byte(atomXML))
+	signature := "sha1=" + hex.EncodeToString(mac.Sum(nil))
+
 	processor.On("ProcessEvent", mock.Anything, atomXML).Return(nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(atomXML))
+	req.Header.Set("X-Hub-Signature", signature)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -110,7 +117,8 @@ func TestWebhookHandler_HandleNotification_ProcessingError(t *testing.T) {
 	t.Parallel()
 
 	processor := new(mockProcessor)
-	handler := NewWebhookHandler(processor, "", nil)
+	secret := "test-secret"
+	handler := NewWebhookHandler(processor, secret, nil)
 
 	atomXML := `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
@@ -121,10 +129,16 @@ func TestWebhookHandler_HandleNotification_ProcessingError(t *testing.T) {
   </entry>
 </feed>`
 
+	// Compute valid signature
+	mac := hmac.New(sha1.New, []byte(secret))
+	mac.Write([]byte(atomXML))
+	signature := "sha1=" + hex.EncodeToString(mac.Sum(nil))
+
 	expectedErr := errors.New("processing failed")
 	processor.On("ProcessEvent", mock.Anything, atomXML).Return(expectedErr)
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(atomXML))
+	req.Header.Set("X-Hub-Signature", signature)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

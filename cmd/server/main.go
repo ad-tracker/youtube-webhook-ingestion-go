@@ -104,6 +104,7 @@ func main() {
 				channelEnrichmentRepo,
 				quotaManager,
 				pubSubHubService,
+				config.WebhookSecret,
 			)
 
 			logger.Info("YouTube API client initialized, URL-based channel addition is available")
@@ -220,6 +221,13 @@ func loadConfig() *Config {
 
 	if config.DatabaseURL == "" {
 		slog.Error("DATABASE_URL environment variable is required")
+		os.Exit(1)
+	}
+
+	if config.WebhookSecret == "" {
+		slog.Error("WEBHOOK_SECRET environment variable is required",
+			"help", "This secret is used to verify webhook signatures from YouTube PubSubHub",
+		)
 		os.Exit(1)
 	}
 

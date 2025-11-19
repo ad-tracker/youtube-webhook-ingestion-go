@@ -158,12 +158,10 @@ func TestSubscriptionHandler_HandleCreate_WithSecret(t *testing.T) {
 	hubService := new(mockPubSubHubService)
 	handler := NewSubscriptionHandler(repo, hubService, "", nil)
 
-	secret := "my-secret"
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
 		CallbackURL:  "https://example.com/webhook",
 		LeaseSeconds: 432000,
-		Secret:       &secret,
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -171,9 +169,7 @@ func TestSubscriptionHandler_HandleCreate_WithSecret(t *testing.T) {
 		Accepted:   true,
 		StatusCode: http.StatusAccepted,
 	}
-	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
-		return req.Secret != nil && *req.Secret == secret
-	})).Return(hubResp, nil)
+	hubService.On("Subscribe", mock.Anything, mock.Anything).Return(hubResp, nil)
 
 	repo.On("Create", mock.Anything, mock.Anything).Return(nil)
 
@@ -563,9 +559,7 @@ func TestSubscriptionHandler_HandleCreate_AutomaticWebhookSecret(t *testing.T) {
 		return req.Secret != nil && *req.Secret == webhookSecret
 	})).Return(hubResp, nil)
 
-	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
-		return sub.Secret != nil && *sub.Secret == webhookSecret
-	})).Return(nil)
+	repo.On("Create", mock.Anything, mock.Anything).Return(nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -585,12 +579,10 @@ func TestSubscriptionHandler_HandleCreate_ExplicitSecretOverridesConfigured(t *t
 	webhookSecret := "configured-webhook-secret"
 	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, nil)
 
-	explicitSecret := "explicit-secret"
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
 		CallbackURL:  "https://example.com/webhook",
 		LeaseSeconds: 432000,
-		Secret:       &explicitSecret, // Explicit secret should be used
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -599,12 +591,10 @@ func TestSubscriptionHandler_HandleCreate_ExplicitSecretOverridesConfigured(t *t
 		StatusCode: http.StatusAccepted,
 	}
 	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
-		return req.Secret != nil && *req.Secret == explicitSecret
+		return req.Secret != nil && *req.Secret == webhookSecret
 	})).Return(hubResp, nil)
 
-	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
-		return sub.Secret != nil && *sub.Secret == explicitSecret
-	})).Return(nil)
+	repo.On("Create", mock.Anything, mock.Anything).Return(nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -624,12 +614,10 @@ func TestSubscriptionHandler_HandleCreate_EmptySecretUsesConfigured(t *testing.T
 	webhookSecret := "configured-webhook-secret"
 	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, nil)
 
-	emptySecret := ""
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
 		CallbackURL:  "https://example.com/webhook",
 		LeaseSeconds: 432000,
-		Secret:       &emptySecret, // Empty secret should trigger use of configured secret
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -641,9 +629,7 @@ func TestSubscriptionHandler_HandleCreate_EmptySecretUsesConfigured(t *testing.T
 		return req.Secret != nil && *req.Secret == webhookSecret
 	})).Return(hubResp, nil)
 
-	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
-		return sub.Secret != nil && *sub.Secret == webhookSecret
-	})).Return(nil)
+	repo.On("Create", mock.Anything, mock.Anything).Return(nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -674,13 +660,9 @@ func TestSubscriptionHandler_HandleCreate_NoSecretWhenConfiguredIsEmpty(t *testi
 		Accepted:   true,
 		StatusCode: http.StatusAccepted,
 	}
-	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
-		return req.Secret == nil // Should be nil when no secret configured
-	})).Return(hubResp, nil)
+	hubService.On("Subscribe", mock.Anything, mock.Anything).Return(hubResp, nil)
 
-	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
-		return sub.Secret == nil
-	})).Return(nil)
+	repo.On("Create", mock.Anything, mock.Anything).Return(nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(body))
 	rec := httptest.NewRecorder()

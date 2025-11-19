@@ -100,7 +100,6 @@ func (m *mockPubSubHub) Unsubscribe(ctx context.Context, req *service.SubscribeR
 
 // Helper function to create a test subscription
 func createTestSubscription(id int64, channelID string, expiresIn time.Duration) *models.Subscription {
-	secret := "test-secret"
 	return &models.Subscription{
 		ID:           id,
 		ChannelID:    channelID,
@@ -110,7 +109,6 @@ func createTestSubscription(id int64, channelID string, expiresIn time.Duration)
 		LeaseSeconds: 432000,
 		ExpiresAt:    time.Now().Add(expiresIn),
 		Status:       models.StatusActive,
-		Secret:       &secret,
 		CreatedAt:    time.Now().Add(-48 * time.Hour),
 		UpdatedAt:    time.Now().Add(-48 * time.Hour),
 	}
@@ -300,8 +298,7 @@ func TestRenewalService_renewSubscription_Success(t *testing.T) {
 		return req.HubURL == subscription.HubURL &&
 			req.TopicURL == subscription.TopicURL &&
 			req.CallbackURL == subscription.CallbackURL &&
-			req.LeaseSeconds == subscription.LeaseSeconds &&
-			req.Secret == subscription.Secret
+			req.LeaseSeconds == subscription.LeaseSeconds
 	})).Return(hubResponse, nil)
 
 	// Mock repository to update subscription
@@ -468,11 +465,13 @@ func TestLoadConfig(t *testing.T) {
 			name: "all values set",
 			envVars: map[string]string{
 				"DATABASE_URL":     "postgres://localhost/testdb",
+				"WEBHOOK_SECRET":   "test-secret-123",
 				"RENEWAL_INTERVAL": "4h",
 				"BATCH_SIZE":       "50",
 			},
 			expected: &Config{
 				DatabaseURL:     "postgres://localhost/testdb",
+				WebhookSecret:   "test-secret-123",
 				RenewalInterval: 4 * time.Hour,
 				BatchSize:       50,
 			},
@@ -481,10 +480,12 @@ func TestLoadConfig(t *testing.T) {
 		{
 			name: "default values",
 			envVars: map[string]string{
-				"DATABASE_URL": "postgres://localhost/testdb",
+				"DATABASE_URL":   "postgres://localhost/testdb",
+				"WEBHOOK_SECRET": "test-secret-123",
 			},
 			expected: &Config{
 				DatabaseURL:     "postgres://localhost/testdb",
+				WebhookSecret:   "test-secret-123",
 				RenewalInterval: 6 * time.Hour,
 				BatchSize:       100,
 			},
@@ -502,6 +503,7 @@ func TestLoadConfig(t *testing.T) {
 			config := loadConfig()
 
 			assert.Equal(t, tt.expected.DatabaseURL, config.DatabaseURL)
+			assert.Equal(t, tt.expected.WebhookSecret, config.WebhookSecret)
 			assert.Equal(t, tt.expected.RenewalInterval, config.RenewalInterval)
 			assert.Equal(t, tt.expected.BatchSize, config.BatchSize)
 		})
@@ -656,7 +658,6 @@ func TestRenewalService_RenewExpiring_WithSecret(t *testing.T) {
 		batchSize:  100,
 	}
 
-	secret := "my-secret-key"
 	subscription := &models.Subscription{
 		ID:           1,
 		ChannelID:    "UCtest1",
@@ -666,15 +667,12 @@ func TestRenewalService_RenewExpiring_WithSecret(t *testing.T) {
 		LeaseSeconds: 432000,
 		ExpiresAt:    time.Now().Add(12 * time.Hour),
 		Status:       models.StatusActive,
-		Secret:       &secret,
 	}
 
 	repo.On("GetExpiringSoon", mock.Anything, 100).Return([]*models.Subscription{subscription}, nil)
 
-	// Verify secret is passed to hub service
-	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
-		return req.Secret != nil && *req.Secret == secret
-	})).Return(&service.SubscribeResponse{
+	// Verify subscription is passed to hub service
+	hubService.On("Subscribe", mock.Anything, mock.Anything).Return(&service.SubscribeResponse{
 		Accepted:     true,
 		StatusCode:   202,
 		LeaseSeconds: 432000,
@@ -710,15 +708,12 @@ func TestRenewalService_RenewExpiring_WithoutSecret(t *testing.T) {
 		LeaseSeconds: 432000,
 		ExpiresAt:    time.Now().Add(12 * time.Hour),
 		Status:       models.StatusActive,
-		Secret:       nil,
 	}
 
 	repo.On("GetExpiringSoon", mock.Anything, 100).Return([]*models.Subscription{subscription}, nil)
 
-	// Verify secret is nil
-	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
-		return req.Secret == nil
-	})).Return(&service.SubscribeResponse{
+	// Verify subscription is passed to hub service
+	hubService.On("Subscribe", mock.Anything, mock.Anything).Return(&service.SubscribeResponse{
 		Accepted:     true,
 		StatusCode:   202,
 		LeaseSeconds: 432000,

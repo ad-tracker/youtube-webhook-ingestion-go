@@ -21,6 +21,7 @@ type ChannelResolverService struct {
 	enrichmentRepo   repository.ChannelEnrichmentRepository
 	quotaManager     *quota.Manager
 	pubSubHubService *PubSubHubService
+	webhookSecret    string
 }
 
 // NewChannelResolverService creates a new channel resolver service
@@ -31,6 +32,7 @@ func NewChannelResolverService(
 	enrichmentRepo repository.ChannelEnrichmentRepository,
 	quotaManager *quota.Manager,
 	pubSubHubService *PubSubHubService,
+	webhookSecret string,
 ) *ChannelResolverService {
 	return &ChannelResolverService{
 		youtubeClient:    youtubeClient,
@@ -39,6 +41,7 @@ func NewChannelResolverService(
 		enrichmentRepo:   enrichmentRepo,
 		quotaManager:     quotaManager,
 		pubSubHubService: pubSubHubService,
+		webhookSecret:    webhookSecret,
 	}
 }
 
@@ -161,7 +164,7 @@ func (s *ChannelResolverService) createSubscription(ctx context.Context, channel
 			TopicURL:     subscription.TopicURL,
 			CallbackURL:  subscription.CallbackURL,
 			LeaseSeconds: subscription.LeaseSeconds,
-			Secret:       subscription.Secret,
+			Secret:       &s.webhookSecret,
 		}
 		_, err = s.pubSubHubService.Subscribe(ctx, subReq)
 		if err != nil {

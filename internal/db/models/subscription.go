@@ -23,7 +23,6 @@ type Subscription struct {
 	LeaseSeconds   int        `db:"lease_seconds" json:"lease_seconds"`
 	ExpiresAt      time.Time  `db:"expires_at" json:"expires_at"`
 	Status         string     `db:"status" json:"status"`
-	Secret         *string    `db:"secret" json:"secret,omitempty"`
 	LastVerifiedAt *time.Time `db:"last_verified_at" json:"last_verified_at,omitempty"`
 	CreatedAt      time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt      time.Time  `db:"updated_at" json:"updated_at"`
@@ -31,7 +30,7 @@ type Subscription struct {
 
 // NewSubscription creates a new Subscription with the given parameters.
 // It automatically constructs the topic URL from the channel ID.
-func NewSubscription(channelID, callbackURL string, leaseSeconds int, secret *string) *Subscription {
+func NewSubscription(channelID, callbackURL string, leaseSeconds int) *Subscription {
 	now := time.Now()
 	topicURL := fmt.Sprintf("https://www.youtube.com/xml/feeds/videos.xml?channel_id=%s", channelID)
 
@@ -43,7 +42,6 @@ func NewSubscription(channelID, callbackURL string, leaseSeconds int, secret *st
 		LeaseSeconds: leaseSeconds,
 		ExpiresAt:    now.Add(time.Duration(leaseSeconds) * time.Second),
 		Status:       StatusPending,
-		Secret:       secret,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
