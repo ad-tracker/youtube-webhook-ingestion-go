@@ -156,7 +156,14 @@ func (s *ChannelResolverService) createSubscription(ctx context.Context, channel
 
 	// Subscribe to PubSubHubbub
 	if s.pubSubHubService != nil {
-		err = s.pubSubHubService.Subscribe(ctx, subscription)
+		subReq := &SubscribeRequest{
+			HubURL:       subscription.HubURL,
+			TopicURL:     subscription.TopicURL,
+			CallbackURL:  subscription.CallbackURL,
+			LeaseSeconds: subscription.LeaseSeconds,
+			Secret:       subscription.Secret,
+		}
+		_, err = s.pubSubHubService.Subscribe(ctx, subReq)
 		if err != nil {
 			log.Printf("[ChannelResolver] Warning: Failed to subscribe to PubSubHubbub: %v", err)
 			// Update status to failed
