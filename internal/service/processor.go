@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"ad-tracker/youtube-webhook-ingestion/internal/db"
 	"ad-tracker/youtube-webhook-ingestion/internal/db/models"
 	"ad-tracker/youtube-webhook-ingestion/internal/db/repository"
 	"ad-tracker/youtube-webhook-ingestion/internal/parser"
+	"ad-tracker/youtube-webhook-ingestion/internal/queue"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -17,6 +19,9 @@ type EventProcessor interface {
 	// ProcessEvent processes a raw Atom feed XML from a webhook notification.
 	// It parses the XML, saves the event, and updates projection tables in a transaction.
 	ProcessEvent(ctx context.Context, rawXML string) error
+
+	// SetQueueClient sets the queue client for enrichment job enqueueing (optional)
+	SetQueueClient(client *queue.Client)
 }
 
 type eventProcessor struct {
@@ -25,6 +30,7 @@ type eventProcessor struct {
 	videoRepo        repository.VideoRepository
 	channelRepo      repository.ChannelRepository
 	videoUpdateRepo  repository.VideoUpdateRepository
+	queueClient      *queue.Client // Optional - for enqueueing enrichment jobs
 }
 
 // NewEventProcessor creates a new EventProcessor with the given repositories.
@@ -41,7 +47,13 @@ func NewEventProcessor(
 		videoRepo:        videoRepo,
 		channelRepo:      channelRepo,
 		videoUpdateRepo:  videoUpdateRepo,
+		queueClient:      nil, // Will be set via SetQueueClient if available
 	}
+}
+
+// SetQueueClient sets the queue client for enrichment job enqueueing (optional)
+func (p *eventProcessor) SetQueueClient(client *queue.Client) {
+	p.queueClient = client
 }
 
 func (p *eventProcessor) ProcessEvent(ctx context.Context, rawXML string) error {
@@ -94,6 +106,24 @@ func (p *eventProcessor) ProcessEvent(ctx context.Context, rawXML string) error 
 	// Return the original processing error if there was one
 	if processingErr != nil {
 		return fmt.Errorf("process projections: %w", processingErr)
+	}
+
+	// Enqueue enrichment job if queue client is available
+	// Only enqueue for new videos to avoid overwhelming the queue
+	if p.queueClient != nil {
+		// Determine if this is a new video
+		existingVideo, _ := p.videoRepo.GetVideoByID(ctx, videoData.VideoID)
+		updateType := p.determineUpdateType(existingVideo, videoData)
+
+		if updateType == "new_video" {
+			// Enqueue enrichment job (don't fail the webhook if this fails)
+			if err := p.queueClient.EnqueueVideoEnrichment(ctx, videoData.VideoID, videoData.ChannelID, 0); err != nil {
+				log.Printf("[EventProcessor] Failed to enqueue enrichment job for video %s: %v", videoData.VideoID, err)
+				// Don't return error - the video was still processed successfully
+			} else {
+				log.Printf("[EventProcessor] Enqueued enrichment job for new video: %s", videoData.VideoID)
+			}
+		}
 	}
 
 	return nil

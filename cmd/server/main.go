@@ -14,6 +14,7 @@ import (
 	"ad-tracker/youtube-webhook-ingestion/internal/db/repository"
 	"ad-tracker/youtube-webhook-ingestion/internal/handler"
 	"ad-tracker/youtube-webhook-ingestion/internal/middleware"
+	"ad-tracker/youtube-webhook-ingestion/internal/queue"
 	"ad-tracker/youtube-webhook-ingestion/internal/service"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -63,6 +64,21 @@ func main() {
 		channelRepo,
 		videoUpdateRepo,
 	)
+
+	// Initialize queue client for enrichment (optional)
+	// If Redis URL is configured, set up enrichment job enqueueing
+	if config.RedisURL != "" {
+		jobRepo := repository.NewEnrichmentJobRepository(pool)
+		queueClient, err := queue.NewClient(config.RedisURL, jobRepo)
+		if err != nil {
+			logger.Warn("failed to initialize queue client, enrichment jobs will not be enqueued",
+				"error", err,
+			)
+		} else {
+			processor.SetQueueClient(queueClient)
+			logger.Info("queue client initialized, enrichment jobs will be enqueued for new videos")
+		}
+	}
 
 	// Initialize PubSubHub service
 	pubSubHubService := service.NewPubSubHubService(&http.Client{}, logger)
@@ -150,6 +166,7 @@ func main() {
 type Config struct {
 	Port          string
 	DatabaseURL   string
+	RedisURL      string
 	WebhookSecret string
 	WebhookPath   string
 	APIKeys       []string
@@ -160,6 +177,7 @@ func loadConfig() *Config {
 	config := &Config{
 		Port:          getEnv("PORT", defaultPort),
 		DatabaseURL:   getEnv("DATABASE_URL", ""),
+		RedisURL:      getEnv("REDIS_URL", ""),
 		WebhookSecret: getEnv("WEBHOOK_SECRET", ""),
 		WebhookPath:   getEnv("WEBHOOK_PATH", defaultWebhookPath),
 		APIKeys:       parseAPIKeys(getEnv("API_KEYS", "")),
