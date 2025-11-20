@@ -21,6 +21,7 @@ type SubscriptionCRUDHandler struct {
 	repo          repository.SubscriptionRepository
 	hubService    service.PubSubHub
 	webhookSecret string
+	webhookURL    string
 	logger        *slog.Logger
 }
 
@@ -29,6 +30,7 @@ func NewSubscriptionCRUDHandler(
 	repo repository.SubscriptionRepository,
 	hubService service.PubSubHub,
 	webhookSecret string,
+	webhookURL string,
 	logger *slog.Logger,
 ) *SubscriptionCRUDHandler {
 	if logger == nil {
@@ -38,6 +40,7 @@ func NewSubscriptionCRUDHandler(
 		repo:          repo,
 		hubService:    hubService,
 		webhookSecret: webhookSecret,
+		webhookURL:    webhookURL,
 		logger:        logger,
 	}
 }
@@ -118,19 +121,19 @@ func (h *SubscriptionCRUDHandler) handleCreate(w http.ResponseWriter, r *http.Re
 		req.LeaseSeconds = 432000
 	}
 
-	sub := models.NewSubscription(req.ChannelID, req.CallbackURL, req.LeaseSeconds)
+	sub := models.NewSubscription(req.ChannelID, req.LeaseSeconds)
 
 	hubReq := &service.SubscribeRequest{
 		HubURL:       sub.HubURL,
 		TopicURL:     sub.TopicURL,
-		CallbackURL:  sub.CallbackURL,
+		CallbackURL:  h.webhookURL,
 		LeaseSeconds: sub.LeaseSeconds,
 		Secret:       &h.webhookSecret,
 	}
 
 	h.logger.Info("attempting to subscribe to PubSubHub",
 		"channel_id", req.ChannelID,
-		"callback_url", req.CallbackURL,
+		"callback_url", h.webhookURL,
 	)
 
 	hubResp, err := h.hubService.Subscribe(r.Context(), hubReq)
@@ -162,7 +165,7 @@ func (h *SubscriptionCRUDHandler) handleCreate(w http.ResponseWriter, r *http.Re
 		)
 
 		if db.IsDuplicateKey(err) {
-			sendError(w, http.StatusConflict, "subscription already exists", "a subscription for this channel and callback URL already exists", nil)
+			sendError(w, http.StatusConflict, "subscription already exists", "a subscription for this channel already exists", nil)
 			return
 		}
 
@@ -295,7 +298,7 @@ func (h *SubscriptionCRUDHandler) handleDelete(w http.ResponseWriter, r *http.Re
 			unsubReq := &service.SubscribeRequest{
 				HubURL:      sub.HubURL,
 				TopicURL:    sub.TopicURL,
-				CallbackURL: sub.CallbackURL,
+				CallbackURL: h.webhookURL,
 			}
 
 			_, err := h.hubService.Unsubscribe(r.Context(), unsubReq)
@@ -330,14 +333,6 @@ func (h *SubscriptionCRUDHandler) validateCreateRequest(req *CreateSubscriptionR
 
 	if !YouTubeChannelIDRegex.MatchString(req.ChannelID) {
 		return errors.New("invalid channel_id format (must start with 'UC' followed by 22 characters)")
-	}
-
-	if req.CallbackURL == "" {
-		return errors.New("callback_url is required")
-	}
-
-	if !strings.HasPrefix(req.CallbackURL, "http://") && !strings.HasPrefix(req.CallbackURL, "https://") {
-		return errors.New("callback_url must be a valid HTTP or HTTPS URL")
 	}
 
 	if req.LeaseSeconds < 0 {
@@ -393,7 +388,7 @@ func (h *SubscriptionCRUDHandler) handleRenewAll(w http.ResponseWriter, r *http.
 		hubReq := &service.SubscribeRequest{
 			HubURL:       sub.HubURL,
 			TopicURL:     sub.TopicURL,
-			CallbackURL:  sub.CallbackURL,
+			CallbackURL:  h.webhookURL,
 			LeaseSeconds: sub.LeaseSeconds,
 			Secret:       &h.webhookSecret,
 		}

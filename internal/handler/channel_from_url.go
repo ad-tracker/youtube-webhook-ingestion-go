@@ -27,8 +27,7 @@ func NewChannelFromURLHandler(resolverService *service.ChannelResolverService, l
 
 // CreateChannelFromURLRequest represents the request to create a channel from a URL
 type CreateChannelFromURLRequest struct {
-	URL         string `json:"url"`
-	CallbackURL string `json:"callback_url,omitempty"`
+	URL string `json:"url"`
 }
 
 // CreateChannelFromURLResponse represents the response from creating a channel from URL
@@ -61,12 +60,11 @@ func (h *ChannelFromURLHandler) HandleCreateFromURL(w http.ResponseWriter, r *ht
 		return
 	}
 
-	h.logger.Info("Creating channel from URL", "url", req.URL, "callback_url", req.CallbackURL)
+	h.logger.Info("Creating channel from URL", "url", req.URL)
 
 	// Resolve channel from URL
 	serviceReq := service.ResolveChannelFromURLRequest{
-		URL:         req.URL,
-		CallbackURL: req.CallbackURL,
+		URL: req.URL,
 	}
 
 	result, err := h.resolverService.ResolveChannelFromURL(r.Context(), serviceReq)

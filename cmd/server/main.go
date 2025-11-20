@@ -105,6 +105,7 @@ func main() {
 				quotaManager,
 				pubSubHubService,
 				config.WebhookSecret,
+				config.WebhookURL,
 			)
 
 			logger.Info("YouTube API client initialized, URL-based channel addition is available")
@@ -119,7 +120,7 @@ func main() {
 	channelHandler := handler.NewChannelHandler(channelRepo, logger)
 	videoHandler := handler.NewVideoHandler(videoRepo, logger)
 	videoUpdateHandler := handler.NewVideoUpdateHandler(videoUpdateRepo, logger)
-	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, logger)
+	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, config.WebhookURL, logger)
 	enrichmentHandler := handler.NewEnrichmentHandler(videoEnrichmentRepo, channelEnrichmentRepo, logger)
 
 	// Channel from URL handler (only if YouTube API is available)
@@ -203,6 +204,7 @@ type Config struct {
 	RedisURL      string
 	WebhookSecret string
 	WebhookPath   string
+	WebhookURL    string
 	APIKeys       []string
 	YouTubeAPIKey string
 }
@@ -215,6 +217,7 @@ func loadConfig() *Config {
 		RedisURL:      getEnv("REDIS_URL", ""),
 		WebhookSecret: getEnv("WEBHOOK_SECRET", ""),
 		WebhookPath:   getEnv("WEBHOOK_PATH", defaultWebhookPath),
+		WebhookURL:    getEnv("WEBHOOK_URL", ""),
 		APIKeys:       parseAPIKeys(getEnv("API_KEYS", "")),
 		YouTubeAPIKey: getEnv("YOUTUBE_API_KEY", ""),
 	}
@@ -227,6 +230,13 @@ func loadConfig() *Config {
 	if config.WebhookSecret == "" {
 		slog.Error("WEBHOOK_SECRET environment variable is required",
 			"help", "This secret is used to verify webhook signatures from YouTube PubSubHub",
+		)
+		os.Exit(1)
+	}
+
+	if config.WebhookURL == "" {
+		slog.Error("WEBHOOK_URL environment variable is required",
+			"help", "This is the public URL where YouTube will send webhook notifications (e.g., https://webhooks.example.com/webhook)",
 		)
 		os.Exit(1)
 	}

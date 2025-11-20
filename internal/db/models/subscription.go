@@ -18,7 +18,6 @@ type Subscription struct {
 	ID             int64      `db:"id" json:"id"`
 	ChannelID      string     `db:"channel_id" json:"channel_id"`
 	TopicURL       string     `db:"topic_url" json:"topic_url"`
-	CallbackURL    string     `db:"callback_url" json:"callback_url"`
 	HubURL         string     `db:"hub_url" json:"hub_url"`
 	LeaseSeconds   int        `db:"lease_seconds" json:"lease_seconds"`
 	ExpiresAt      time.Time  `db:"expires_at" json:"expires_at"`
@@ -30,14 +29,13 @@ type Subscription struct {
 
 // NewSubscription creates a new Subscription with the given parameters.
 // It automatically constructs the topic URL from the channel ID.
-func NewSubscription(channelID, callbackURL string, leaseSeconds int) *Subscription {
+func NewSubscription(channelID string, leaseSeconds int) *Subscription {
 	now := time.Now()
 	topicURL := fmt.Sprintf("https://www.youtube.com/xml/feeds/videos.xml?channel_id=%s", channelID)
 
 	return &Subscription{
 		ChannelID:    channelID,
 		TopicURL:     topicURL,
-		CallbackURL:  callbackURL,
 		HubURL:       "https://pubsubhubbub.appspot.com/subscribe",
 		LeaseSeconds: leaseSeconds,
 		ExpiresAt:    now.Add(time.Duration(leaseSeconds) * time.Second),

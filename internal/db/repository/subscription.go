@@ -60,17 +60,16 @@ func NewSubscriptionRepository(pool *pgxpool.Pool) SubscriptionRepository {
 func (r *subscriptionRepository) Create(ctx context.Context, sub *models.Subscription) error {
 	query := `
 		INSERT INTO pubsub_subscriptions (
-			channel_id, topic_url, callback_url, hub_url, lease_seconds,
+			channel_id, topic_url, hub_url, lease_seconds,
 			expires_at, status, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, updated_at
 	`
 
 	err := r.pool.QueryRow(ctx, query,
 		sub.ChannelID,
 		sub.TopicURL,
-		sub.CallbackURL,
 		sub.HubURL,
 		sub.LeaseSeconds,
 		sub.ExpiresAt,
@@ -92,7 +91,7 @@ func (r *subscriptionRepository) Create(ctx context.Context, sub *models.Subscri
 
 func (r *subscriptionRepository) GetByID(ctx context.Context, id int64) (*models.Subscription, error) {
 	query := `
-		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
+		SELECT id, channel_id, topic_url, hub_url, lease_seconds,
 		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		WHERE id = $1
@@ -103,7 +102,6 @@ func (r *subscriptionRepository) GetByID(ctx context.Context, id int64) (*models
 		&sub.ID,
 		&sub.ChannelID,
 		&sub.TopicURL,
-		&sub.CallbackURL,
 		&sub.HubURL,
 		&sub.LeaseSeconds,
 		&sub.ExpiresAt,
@@ -122,7 +120,7 @@ func (r *subscriptionRepository) GetByID(ctx context.Context, id int64) (*models
 
 func (r *subscriptionRepository) GetByChannelID(ctx context.Context, channelID string) ([]*models.Subscription, error) {
 	query := `
-		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
+		SELECT id, channel_id, topic_url, hub_url, lease_seconds,
 		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		WHERE channel_id = $1
@@ -143,20 +141,18 @@ func (r *subscriptionRepository) Update(ctx context.Context, sub *models.Subscri
 		UPDATE pubsub_subscriptions
 		SET channel_id = $1,
 		    topic_url = $2,
-		    callback_url = $3,
-		    hub_url = $4,
-		    lease_seconds = $5,
-		    expires_at = $6,
-		    status = $7,
-		    last_verified_at = $8
-		WHERE id = $9
+		    hub_url = $3,
+		    lease_seconds = $4,
+		    expires_at = $5,
+		    status = $6,
+		    last_verified_at = $7
+		WHERE id = $8
 		RETURNING updated_at
 	`
 
 	err := r.pool.QueryRow(ctx, query,
 		sub.ChannelID,
 		sub.TopicURL,
-		sub.CallbackURL,
 		sub.HubURL,
 		sub.LeaseSeconds,
 		sub.ExpiresAt,
@@ -189,7 +185,7 @@ func (r *subscriptionRepository) Delete(ctx context.Context, id int64) error {
 
 func (r *subscriptionRepository) GetExpiringSoon(ctx context.Context, limit int) ([]*models.Subscription, error) {
 	query := `
-		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
+		SELECT id, channel_id, topic_url, hub_url, lease_seconds,
 		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		WHERE status = $1 AND expires_at <= NOW() + INTERVAL '24 hours'
@@ -208,7 +204,7 @@ func (r *subscriptionRepository) GetExpiringSoon(ctx context.Context, limit int)
 
 func (r *subscriptionRepository) GetByStatus(ctx context.Context, status string, limit int) ([]*models.Subscription, error) {
 	query := `
-		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
+		SELECT id, channel_id, topic_url, hub_url, lease_seconds,
 		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		WHERE status = $1
@@ -264,7 +260,7 @@ func (r *subscriptionRepository) List(ctx context.Context, filters *Subscription
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, channel_id, topic_url, callback_url, hub_url, lease_seconds,
+		SELECT id, channel_id, topic_url, hub_url, lease_seconds,
 		       expires_at, status, last_verified_at, created_at, updated_at
 		FROM pubsub_subscriptions
 		%s
@@ -298,7 +294,6 @@ func scanSubscriptions(rows pgx.Rows) ([]*models.Subscription, error) {
 			&sub.ID,
 			&sub.ChannelID,
 			&sub.TopicURL,
-			&sub.CallbackURL,
 			&sub.HubURL,
 			&sub.LeaseSeconds,
 			&sub.ExpiresAt,

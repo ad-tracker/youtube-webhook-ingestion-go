@@ -23,11 +23,7 @@ func TestSubscriptionRepository_Create(t *testing.T) {
 	t.Run("creates new subscription successfully", func(t *testing.T) {
 		td.TruncateTables(t)
 
-		sub := models.NewSubscription(
-			"UCtest123",
-			"https://example.com/webhook",
-			432000,
-		)
+		sub := models.NewSubscription("UCtest123", 432000)
 
 		err := repo.Create(ctx, sub)
 		require.NoError(t, err)
@@ -41,20 +37,12 @@ func TestSubscriptionRepository_Create(t *testing.T) {
 	t.Run("returns error on duplicate channel_id and callback_url", func(t *testing.T) {
 		td.TruncateTables(t)
 
-		sub1 := models.NewSubscription(
-			"UCtest789",
-			"https://example.com/webhook3",
-			432000,
-		)
+		sub1 := models.NewSubscription("UCtest789", 432000)
 		err := repo.Create(ctx, sub1)
 		require.NoError(t, err)
 
 		// Try to create duplicate
-		sub2 := models.NewSubscription(
-			"UCtest789",
-			"https://example.com/webhook3",
-			432000,
-		)
+		sub2 := models.NewSubscription("UCtest789", 432000)
 		err = repo.Create(ctx, sub2)
 		require.Error(t, err)
 		assert.True(t, db.IsDuplicateKey(err))
@@ -71,11 +59,7 @@ func TestSubscriptionRepository_GetByID(t *testing.T) {
 	t.Run("retrieves subscription successfully", func(t *testing.T) {
 		td.TruncateTables(t)
 
-		sub := models.NewSubscription(
-			"UCtest123",
-			"https://example.com/webhook",
-			432000,
-		)
+		sub := models.NewSubscription("UCtest123", 432000)
 		err := repo.Create(ctx, sub)
 		require.NoError(t, err)
 
@@ -84,7 +68,6 @@ func TestSubscriptionRepository_GetByID(t *testing.T) {
 		assert.Equal(t, sub.ID, retrieved.ID)
 		assert.Equal(t, sub.ChannelID, retrieved.ChannelID)
 		assert.Equal(t, sub.TopicURL, retrieved.TopicURL)
-		assert.Equal(t, sub.CallbackURL, retrieved.CallbackURL)
 	})
 
 	t.Run("returns error for non-existent subscription", func(t *testing.T) {
@@ -103,32 +86,25 @@ func TestSubscriptionRepository_GetByChannelID(t *testing.T) {
 	repo := NewSubscriptionRepository(td.Pool)
 	ctx := context.Background()
 
-	t.Run("retrieves all subscriptions for channel", func(t *testing.T) {
+	t.Run("retrieves subscription for channel", func(t *testing.T) {
 		td.TruncateTables(t)
 
 		channelID := "UCtest123"
 
-		// Create multiple subscriptions for the same channel
-		sub1 := models.NewSubscription(channelID, "https://example.com/webhook1", 432000)
+		// Create subscription for the channel
+		sub1 := models.NewSubscription(channelID, 432000)
 		err := repo.Create(ctx, sub1)
 		require.NoError(t, err)
 
-		time.Sleep(5 * time.Millisecond)
-
-		sub2 := models.NewSubscription(channelID, "https://example.com/webhook2", 432000)
-		err = repo.Create(ctx, sub2)
-		require.NoError(t, err)
-
 		// Create subscription for different channel
-		sub3 := models.NewSubscription("UCother456", "https://example.com/webhook3", 432000)
-		err = repo.Create(ctx, sub3)
+		sub2 := models.NewSubscription("UCother456", 432000)
+		err = repo.Create(ctx, sub2)
 		require.NoError(t, err)
 
 		subscriptions, err := repo.GetByChannelID(ctx, channelID)
 		require.NoError(t, err)
-		assert.Len(t, subscriptions, 2)
-		assert.Equal(t, sub2.ID, subscriptions[0].ID) // Most recent first
-		assert.Equal(t, sub1.ID, subscriptions[1].ID)
+		assert.Len(t, subscriptions, 1)
+		assert.Equal(t, sub1.ID, subscriptions[0].ID)
 	})
 
 	t.Run("returns empty slice for channel with no subscriptions", func(t *testing.T) {
@@ -150,7 +126,7 @@ func TestSubscriptionRepository_Update(t *testing.T) {
 	t.Run("updates subscription successfully", func(t *testing.T) {
 		td.TruncateTables(t)
 
-		sub := models.NewSubscription("UCtest123", "https://example.com/webhook", 432000)
+		sub := models.NewSubscription("UCtest123", 432000)
 		err := repo.Create(ctx, sub)
 		require.NoError(t, err)
 
@@ -193,7 +169,7 @@ func TestSubscriptionRepository_Delete(t *testing.T) {
 	t.Run("deletes subscription successfully", func(t *testing.T) {
 		td.TruncateTables(t)
 
-		sub := models.NewSubscription("UCtest123", "https://example.com/webhook", 432000)
+		sub := models.NewSubscription("UCtest123", 432000)
 		err := repo.Create(ctx, sub)
 		require.NoError(t, err)
 
@@ -226,19 +202,19 @@ func TestSubscriptionRepository_GetExpiringSoon(t *testing.T) {
 		td.TruncateTables(t)
 
 		// Create subscription expiring in 1 hour
-		sub1 := models.NewSubscription("UCtest1", "https://example.com/webhook1", 3600)
+		sub1 := models.NewSubscription("UCtest1", 3600)
 		sub1.Status = models.StatusActive
 		err := repo.Create(ctx, sub1)
 		require.NoError(t, err)
 
 		// Create subscription expiring in 2 days (should not be returned)
-		sub2 := models.NewSubscription("UCtest2", "https://example.com/webhook2", 172800)
+		sub2 := models.NewSubscription("UCtest2", 172800)
 		sub2.Status = models.StatusActive
 		err = repo.Create(ctx, sub2)
 		require.NoError(t, err)
 
 		// Create pending subscription expiring soon (should not be returned)
-		sub3 := models.NewSubscription("UCtest3", "https://example.com/webhook3", 3600)
+		sub3 := models.NewSubscription("UCtest3", 3600)
 		err = repo.Create(ctx, sub3)
 		require.NoError(t, err)
 
@@ -253,7 +229,7 @@ func TestSubscriptionRepository_GetExpiringSoon(t *testing.T) {
 
 		// Create multiple subscriptions expiring soon
 		for i := 0; i < 5; i++ {
-			sub := models.NewSubscription("UCtest"+string(rune('1'+i)), "https://example.com/webhook"+string(rune('1'+i)), 3600)
+			sub := models.NewSubscription("UCtest"+string(rune('1'+i)), 3600)
 			sub.Status = models.StatusActive
 			err := repo.Create(ctx, sub)
 			require.NoError(t, err)
@@ -277,16 +253,16 @@ func TestSubscriptionRepository_GetByStatus(t *testing.T) {
 		td.TruncateTables(t)
 
 		// Create subscriptions with different statuses
-		sub1 := models.NewSubscription("UCtest1", "https://example.com/webhook1", 432000)
+		sub1 := models.NewSubscription("UCtest1", 432000)
 		err := repo.Create(ctx, sub1)
 		require.NoError(t, err)
 
-		sub2 := models.NewSubscription("UCtest2", "https://example.com/webhook2", 432000)
+		sub2 := models.NewSubscription("UCtest2", 432000)
 		sub2.MarkActive()
 		err = repo.Create(ctx, sub2)
 		require.NoError(t, err)
 
-		sub3 := models.NewSubscription("UCtest3", "https://example.com/webhook3", 432000)
+		sub3 := models.NewSubscription("UCtest3", 432000)
 		sub3.MarkFailed()
 		err = repo.Create(ctx, sub3)
 		require.NoError(t, err)
@@ -315,7 +291,7 @@ func TestSubscriptionRepository_GetByStatus(t *testing.T) {
 
 		// Create multiple pending subscriptions
 		for i := 0; i < 5; i++ {
-			sub := models.NewSubscription("UCtest"+string(rune('1'+i)), "https://example.com/webhook"+string(rune('1'+i)), 432000)
+			sub := models.NewSubscription("UCtest"+string(rune('1'+i)), 432000)
 			err := repo.Create(ctx, sub)
 			require.NoError(t, err)
 			time.Sleep(5 * time.Millisecond)
