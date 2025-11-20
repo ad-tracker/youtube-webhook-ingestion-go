@@ -104,7 +104,6 @@ func createTestSubscription(id int64, channelID string, expiresIn time.Duration)
 		ID:           id,
 		ChannelID:    channelID,
 		TopicURL:     "https://www.youtube.com/xml/feeds/videos.xml?channel_id=" + channelID,
-		CallbackURL:  "https://example.com/webhook",
 		HubURL:       "https://pubsubhubbub.appspot.com/subscribe",
 		LeaseSeconds: 432000,
 		ExpiresAt:    time.Now().Add(expiresIn),
@@ -131,6 +130,7 @@ func TestRenewalService_RenewExpiring_Success(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	// Create test subscriptions
@@ -174,6 +174,7 @@ func TestRenewalService_RenewExpiring_NoSubscriptions(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	// Mock repository to return empty list
@@ -198,6 +199,7 @@ func TestRenewalService_RenewExpiring_GetExpiringSoonError(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	// Mock repository to return an error
@@ -223,6 +225,7 @@ func TestRenewalService_RenewExpiring_PartialSuccess(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	// Create test subscriptions
@@ -284,6 +287,7 @@ func TestRenewalService_renewSubscription_Success(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -297,7 +301,6 @@ func TestRenewalService_renewSubscription_Success(t *testing.T) {
 	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
 		return req.HubURL == subscription.HubURL &&
 			req.TopicURL == subscription.TopicURL &&
-			req.CallbackURL == subscription.CallbackURL &&
 			req.LeaseSeconds == subscription.LeaseSeconds
 	})).Return(hubResponse, nil)
 
@@ -325,6 +328,7 @@ func TestRenewalService_renewSubscription_HubRejected(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -360,6 +364,7 @@ func TestRenewalService_renewSubscription_HubError(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -394,6 +399,7 @@ func TestRenewalService_renewSubscription_UpdateError(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -430,6 +436,7 @@ func TestRenewalService_renewSubscription_MarkFailedUpdateError(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -466,12 +473,14 @@ func TestLoadConfig(t *testing.T) {
 			envVars: map[string]string{
 				"DATABASE_URL":     "postgres://localhost/testdb",
 				"WEBHOOK_SECRET":   "test-secret-123",
+				"WEBHOOK_URL":      "https://example.com/webhook",
 				"RENEWAL_INTERVAL": "4h",
 				"BATCH_SIZE":       "50",
 			},
 			expected: &Config{
 				DatabaseURL:     "postgres://localhost/testdb",
 				WebhookSecret:   "test-secret-123",
+				WebhookURL:      "https://example.com/webhook",
 				RenewalInterval: 4 * time.Hour,
 				BatchSize:       50,
 			},
@@ -482,10 +491,12 @@ func TestLoadConfig(t *testing.T) {
 			envVars: map[string]string{
 				"DATABASE_URL":   "postgres://localhost/testdb",
 				"WEBHOOK_SECRET": "test-secret-123",
+				"WEBHOOK_URL":    "https://example.com/webhook",
 			},
 			expected: &Config{
 				DatabaseURL:     "postgres://localhost/testdb",
 				WebhookSecret:   "test-secret-123",
+				WebhookURL:      "https://example.com/webhook",
 				RenewalInterval: 6 * time.Hour,
 				BatchSize:       100,
 			},
@@ -504,6 +515,7 @@ func TestLoadConfig(t *testing.T) {
 
 			assert.Equal(t, tt.expected.DatabaseURL, config.DatabaseURL)
 			assert.Equal(t, tt.expected.WebhookSecret, config.WebhookSecret)
+			assert.Equal(t, tt.expected.WebhookURL, config.WebhookURL)
 			assert.Equal(t, tt.expected.RenewalInterval, config.RenewalInterval)
 			assert.Equal(t, tt.expected.BatchSize, config.BatchSize)
 		})
@@ -656,13 +668,13 @@ func TestRenewalService_RenewExpiring_WithSecret(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	subscription := &models.Subscription{
 		ID:           1,
 		ChannelID:    "UCtest1",
 		TopicURL:     "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCtest1",
-		CallbackURL:  "https://example.com/webhook",
 		HubURL:       "https://pubsubhubbub.appspot.com/subscribe",
 		LeaseSeconds: 432000,
 		ExpiresAt:    time.Now().Add(12 * time.Hour),
@@ -697,13 +709,13 @@ func TestRenewalService_RenewExpiring_WithoutSecret(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	subscription := &models.Subscription{
 		ID:           1,
 		ChannelID:    "UCtest1",
 		TopicURL:     "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCtest1",
-		CallbackURL:  "https://example.com/webhook",
 		HubURL:       "https://pubsubhubbub.appspot.com/subscribe",
 		LeaseSeconds: 432000,
 		ExpiresAt:    time.Now().Add(12 * time.Hour),
@@ -738,6 +750,7 @@ func TestRenewalService_RenewExpiring_ContextCancellation(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
+		webhookURL:    "https://example.com/webhook",
 	}
 
 	// Create a cancelled context

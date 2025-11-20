@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"ad-tracker/youtube-webhook-ingestion/internal/db"
 	"ad-tracker/youtube-webhook-ingestion/internal/db/models"
@@ -25,6 +24,7 @@ type SubscriptionHandler struct {
 	repo          repository.SubscriptionRepository
 	hubService    service.PubSubHub
 	webhookSecret string
+	webhookURL    string
 	logger        *slog.Logger
 }
 
@@ -33,6 +33,7 @@ func NewSubscriptionHandler(
 	repo repository.SubscriptionRepository,
 	hubService service.PubSubHub,
 	webhookSecret string,
+	webhookURL string,
 	logger *slog.Logger,
 ) *SubscriptionHandler {
 	if logger == nil {
@@ -42,6 +43,7 @@ func NewSubscriptionHandler(
 		repo:          repo,
 		hubService:    hubService,
 		webhookSecret: webhookSecret,
+		webhookURL:    webhookURL,
 		logger:        logger,
 	}
 }
@@ -49,7 +51,6 @@ func NewSubscriptionHandler(
 // CreateSubscriptionRequest represents the request body for creating a subscription.
 type CreateSubscriptionRequest struct {
 	ChannelID    string `json:"channel_id"`
-	CallbackURL  string `json:"callback_url"`
 	LeaseSeconds int    `json:"lease_seconds,omitempty"`
 }
 
@@ -86,20 +87,20 @@ func (h *SubscriptionHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Create subscription model
-	sub := models.NewSubscription(req.ChannelID, req.CallbackURL, req.LeaseSeconds)
+	sub := models.NewSubscription(req.ChannelID, req.LeaseSeconds)
 
 	// Subscribe via PubSubHubbub
 	hubReq := &service.SubscribeRequest{
 		HubURL:       sub.HubURL,
 		TopicURL:     sub.TopicURL,
-		CallbackURL:  sub.CallbackURL,
+		CallbackURL:  h.webhookURL,
 		LeaseSeconds: sub.LeaseSeconds,
 		Secret:       &h.webhookSecret,
 	}
 
 	h.logger.Info("attempting to subscribe to PubSubHub",
 		"channel_id", req.ChannelID,
-		"callback_url", req.CallbackURL,
+		"callback_url", h.webhookURL,
 	)
 
 	hubResp, err := h.hubService.Subscribe(r.Context(), hubReq)
@@ -135,7 +136,7 @@ func (h *SubscriptionHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 
 		// Check if duplicate
 		if db.IsDuplicateKey(err) {
-			h.sendError(w, http.StatusConflict, "subscription already exists", "a subscription for this channel and callback URL already exists")
+			h.sendError(w, http.StatusConflict, "subscription already exists", "a subscription for this channel already exists")
 			return
 		}
 
@@ -164,15 +165,6 @@ func (h *SubscriptionHandler) validateCreateRequest(req *CreateSubscriptionReque
 	// Validate channel ID format
 	if !YouTubeChannelIDRegex.MatchString(req.ChannelID) {
 		return errors.New("invalid channel_id format (must start with 'UC' followed by 22 characters)")
-	}
-
-	if req.CallbackURL == "" {
-		return errors.New("callback_url is required")
-	}
-
-	// Validate callback URL format
-	if !strings.HasPrefix(req.CallbackURL, "http://") && !strings.HasPrefix(req.CallbackURL, "https://") {
-		return errors.New("callback_url must be a valid HTTP or HTTPS URL")
 	}
 
 	if req.LeaseSeconds < 0 {

@@ -109,11 +109,10 @@ func TestSubscriptionHandler_HandleCreate_Success(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, "", nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL:  "https://example.com/webhook",
 		LeaseSeconds: 432000,
 	}
 	body, _ := json.Marshal(reqBody)
@@ -123,13 +122,11 @@ func TestSubscriptionHandler_HandleCreate_Success(t *testing.T) {
 		StatusCode: http.StatusAccepted,
 	}
 	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
-		return req.CallbackURL == reqBody.CallbackURL &&
-			req.LeaseSeconds == reqBody.LeaseSeconds
+			return req.LeaseSeconds == reqBody.LeaseSeconds
 	})).Return(hubResp, nil)
 
 	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
 		return sub.ChannelID == reqBody.ChannelID &&
-			sub.CallbackURL == reqBody.CallbackURL &&
 			sub.Status == models.StatusActive
 	})).Return(nil)
 
@@ -144,7 +141,6 @@ func TestSubscriptionHandler_HandleCreate_Success(t *testing.T) {
 	err := json.NewDecoder(rec.Body).Decode(&response)
 	require.NoError(t, err)
 	assert.Equal(t, reqBody.ChannelID, response.ChannelID)
-	assert.Equal(t, reqBody.CallbackURL, response.CallbackURL)
 	assert.Equal(t, models.StatusActive, response.Status)
 
 	hubService.AssertExpectations(t)
@@ -156,11 +152,10 @@ func TestSubscriptionHandler_HandleCreate_WithSecret(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, "", nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL:  "https://example.com/webhook",
 		LeaseSeconds: 432000,
 	}
 	body, _ := json.Marshal(reqBody)
@@ -188,11 +183,10 @@ func TestSubscriptionHandler_HandleCreate_DefaultLeaseSeconds(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, "", nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL: "https://example.com/webhook",
 		// LeaseSeconds not specified - should default to 432000
 	}
 	body, _ := json.Marshal(reqBody)
@@ -222,7 +216,7 @@ func TestSubscriptionHandler_HandleCreate_InvalidJSON(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, "", nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader([]byte("invalid json")))
 	rec := httptest.NewRecorder()
@@ -248,7 +242,6 @@ func TestSubscriptionHandler_HandleCreate_ValidationErrors(t *testing.T) {
 		{
 			name: "missing channel_id",
 			reqBody: CreateSubscriptionRequest{
-				CallbackURL: "https://example.com/webhook",
 			},
 			errMsg: "channel_id is required",
 		},
@@ -256,30 +249,13 @@ func TestSubscriptionHandler_HandleCreate_ValidationErrors(t *testing.T) {
 			name: "invalid channel_id format",
 			reqBody: CreateSubscriptionRequest{
 				ChannelID:   "invalid",
-				CallbackURL: "https://example.com/webhook",
 			},
 			errMsg: "invalid channel_id format",
-		},
-		{
-			name: "missing callback_url",
-			reqBody: CreateSubscriptionRequest{
-				ChannelID: "UCxxxxxxxxxxxxxxxxxxxxxx",
-			},
-			errMsg: "callback_url is required",
-		},
-		{
-			name: "invalid callback_url format",
-			reqBody: CreateSubscriptionRequest{
-				ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
-				CallbackURL: "not-a-url",
-			},
-			errMsg: "callback_url must be a valid HTTP or HTTPS URL",
 		},
 		{
 			name: "negative lease_seconds",
 			reqBody: CreateSubscriptionRequest{
 				ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
-				CallbackURL:  "https://example.com/webhook",
 				LeaseSeconds: -100,
 			},
 			errMsg: "lease_seconds must be non-negative",
@@ -288,7 +264,6 @@ func TestSubscriptionHandler_HandleCreate_ValidationErrors(t *testing.T) {
 			name: "lease_seconds too large",
 			reqBody: CreateSubscriptionRequest{
 				ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
-				CallbackURL:  "https://example.com/webhook",
 				LeaseSeconds: 1000000,
 			},
 			errMsg: "lease_seconds cannot exceed 864000",
@@ -301,7 +276,7 @@ func TestSubscriptionHandler_HandleCreate_ValidationErrors(t *testing.T) {
 
 			repo := new(mockSubscriptionRepository)
 			hubService := new(mockPubSubHubService)
-			handler := NewSubscriptionHandler(repo, &service.PubSubHubService{}, "", nil)
+			handler := NewSubscriptionHandler(repo, &service.PubSubHubService{}, "", "https://example.com/webhook", nil)
 			handler.hubService = hubService
 
 			body, _ := json.Marshal(tt.reqBody)
@@ -325,11 +300,10 @@ func TestSubscriptionHandler_HandleCreate_HubSubscriptionFailed(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, "", nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL: "https://example.com/webhook",
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -357,11 +331,10 @@ func TestSubscriptionHandler_HandleCreate_DatabaseError(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, "", nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL: "https://example.com/webhook",
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -395,11 +368,10 @@ func TestSubscriptionHandler_HandleCreate_DuplicateSubscription(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, "", nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL: "https://example.com/webhook",
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -434,7 +406,7 @@ func TestSubscriptionHandler_MethodNotAllowed(t *testing.T) {
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, "", nil)
+	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/subscriptions", nil)
 	rec := httptest.NewRecorder()
@@ -454,13 +426,11 @@ func TestGetSubscriptionHandler_Success(t *testing.T) {
 		{
 			ID:          1,
 			ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
-			CallbackURL: "https://example.com/webhook1",
 			Status:      models.StatusActive,
 		},
 		{
 			ID:          2,
 			ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
-			CallbackURL: "https://example.com/webhook2",
 			Status:      models.StatusPending,
 		},
 	}
@@ -541,11 +511,10 @@ func TestSubscriptionHandler_HandleCreate_AutomaticWebhookSecret(t *testing.T) {
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
 	webhookSecret := "configured-webhook-secret"
-	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, nil)
+	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL:  "https://example.com/webhook",
 		LeaseSeconds: 432000,
 		// No Secret provided - should use configured webhookSecret
 	}
@@ -577,11 +546,10 @@ func TestSubscriptionHandler_HandleCreate_ExplicitSecretOverridesConfigured(t *t
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
 	webhookSecret := "configured-webhook-secret"
-	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, nil)
+	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL:  "https://example.com/webhook",
 		LeaseSeconds: 432000,
 	}
 	body, _ := json.Marshal(reqBody)
@@ -612,11 +580,10 @@ func TestSubscriptionHandler_HandleCreate_EmptySecretUsesConfigured(t *testing.T
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
 	webhookSecret := "configured-webhook-secret"
-	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, nil)
+	handler := NewSubscriptionHandler(repo, hubService, webhookSecret, "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL:  "https://example.com/webhook",
 		LeaseSeconds: 432000,
 	}
 	body, _ := json.Marshal(reqBody)
@@ -646,11 +613,10 @@ func TestSubscriptionHandler_HandleCreate_NoSecretWhenConfiguredIsEmpty(t *testi
 
 	repo := new(mockSubscriptionRepository)
 	hubService := new(mockPubSubHubService)
-	handler := NewSubscriptionHandler(repo, hubService, "", nil) // No configured secret
+	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil) // No configured secret
 
 	reqBody := CreateSubscriptionRequest{
 		ChannelID:    "UCxxxxxxxxxxxxxxxxxxxxxx",
-		CallbackURL:  "https://example.com/webhook",
 		LeaseSeconds: 432000,
 		// No Secret provided and no configured secret
 	}

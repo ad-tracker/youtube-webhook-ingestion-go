@@ -59,6 +59,7 @@ func main() {
 		logger:        logger,
 		batchSize:     config.BatchSize,
 		webhookSecret: config.WebhookSecret,
+		webhookURL:    config.WebhookURL,
 	}
 
 	// Set up graceful shutdown
@@ -98,6 +99,7 @@ type RenewalService struct {
 	logger        *slog.Logger
 	batchSize     int
 	webhookSecret string
+	webhookURL    string
 }
 
 // RenewExpiring finds expiring subscriptions and renews them.
@@ -152,7 +154,7 @@ func (s *RenewalService) renewSubscription(ctx context.Context, sub *models.Subs
 	hubReq := &service.SubscribeRequest{
 		HubURL:       sub.HubURL,
 		TopicURL:     sub.TopicURL,
-		CallbackURL:  sub.CallbackURL,
+		CallbackURL:  s.webhookURL,
 		LeaseSeconds: sub.LeaseSeconds,
 		Secret:       &s.webhookSecret,
 	}
@@ -191,6 +193,7 @@ func (s *RenewalService) renewSubscription(ctx context.Context, sub *models.Subs
 type Config struct {
 	DatabaseURL     string
 	WebhookSecret   string
+	WebhookURL      string
 	RenewalInterval time.Duration
 	BatchSize       int
 }
@@ -200,6 +203,7 @@ func loadConfig() *Config {
 	config := &Config{
 		DatabaseURL:     getEnv("DATABASE_URL", ""),
 		WebhookSecret:   getEnv("WEBHOOK_SECRET", ""),
+		WebhookURL:      getEnv("WEBHOOK_URL", ""),
 		RenewalInterval: parseDuration(getEnv("RENEWAL_INTERVAL", "6h")),
 		BatchSize:       parseInt(getEnv("BATCH_SIZE", "100")),
 	}

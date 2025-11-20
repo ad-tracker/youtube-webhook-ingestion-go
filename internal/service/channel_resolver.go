@@ -22,6 +22,7 @@ type ChannelResolverService struct {
 	quotaManager     *quota.Manager
 	pubSubHubService *PubSubHubService
 	webhookSecret    string
+	webhookURL       string
 }
 
 // NewChannelResolverService creates a new channel resolver service
@@ -33,6 +34,7 @@ func NewChannelResolverService(
 	quotaManager *quota.Manager,
 	pubSubHubService *PubSubHubService,
 	webhookSecret string,
+	webhookURL string,
 ) *ChannelResolverService {
 	return &ChannelResolverService{
 		youtubeClient:    youtubeClient,
@@ -42,13 +44,13 @@ func NewChannelResolverService(
 		quotaManager:     quotaManager,
 		pubSubHubService: pubSubHubService,
 		webhookSecret:    webhookSecret,
+		webhookURL:       webhookURL,
 	}
 }
 
 // ResolveChannelFromURLRequest represents the request to resolve a channel from a URL
 type ResolveChannelFromURLRequest struct {
-	URL         string
-	CallbackURL string
+	URL string
 }
 
 // ResolveChannelFromURLResponse represents the response from resolving a channel
@@ -119,14 +121,11 @@ func (s *ChannelResolverService) ResolveChannelFromURL(ctx context.Context, req 
 		}
 	}
 
-	// Step 6: Create PubSubHubbub subscription if callback URL provided
-	var subscription *models.Subscription
-	if req.CallbackURL != "" {
-		subscription, err = s.createSubscription(ctx, ytEnrichment.ChannelID, req.CallbackURL)
-		if err != nil {
-			log.Printf("[ChannelResolver] Warning: Failed to create subscription: %v", err)
-			// Don't fail the entire operation if subscription creation fails
-		}
+	// Step 6: Create PubSubHubbub subscription (always create with configured webhook URL)
+	subscription, err := s.createSubscription(ctx, ytEnrichment.ChannelID)
+	if err != nil {
+		log.Printf("[ChannelResolver] Warning: Failed to create subscription: %v", err)
+		// Don't fail the entire operation if subscription creation fails
 	}
 
 	return &ResolveChannelFromURLResponse{
@@ -138,13 +137,12 @@ func (s *ChannelResolverService) ResolveChannelFromURL(ctx context.Context, req 
 }
 
 // createSubscription creates a PubSubHubbub subscription for a channel
-func (s *ChannelResolverService) createSubscription(ctx context.Context, channelID, callbackURL string) (*models.Subscription, error) {
+func (s *ChannelResolverService) createSubscription(ctx context.Context, channelID string) (*models.Subscription, error) {
 	topicURL := fmt.Sprintf("https://www.youtube.com/xml/feeds/videos.xml?channel_id=%s", channelID)
 
 	subscription := &models.Subscription{
 		ChannelID:    channelID,
 		TopicURL:     topicURL,
-		CallbackURL:  callbackURL,
 		HubURL:       "https://pubsubhubbub.appspot.com/subscribe",
 		LeaseSeconds: 432000, // 5 days
 		ExpiresAt:    time.Now().Add(432000 * time.Second),
@@ -162,7 +160,7 @@ func (s *ChannelResolverService) createSubscription(ctx context.Context, channel
 		subReq := &SubscribeRequest{
 			HubURL:       subscription.HubURL,
 			TopicURL:     subscription.TopicURL,
-			CallbackURL:  subscription.CallbackURL,
+			CallbackURL:  s.webhookURL,
 			LeaseSeconds: subscription.LeaseSeconds,
 			Secret:       &s.webhookSecret,
 		}
