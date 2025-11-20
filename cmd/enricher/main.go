@@ -78,6 +78,7 @@ func main() {
 
 	// Initialize repositories
 	enrichmentRepo := repository.NewEnrichmentRepository(pool)
+	channelEnrichmentRepo := repository.NewChannelEnrichmentRepository(pool)
 	quotaRepo := repository.NewQuotaRepository(pool)
 	jobRepo := repository.NewEnrichmentJobRepository(pool)
 
@@ -127,6 +128,7 @@ func main() {
 		youtubeClient,
 		quotaManager,
 		enrichmentRepo,
+		channelEnrichmentRepo,
 		jobRepo,
 		config.BatchSize,
 	)

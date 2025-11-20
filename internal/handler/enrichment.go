@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -14,7 +15,13 @@ import (
 type EnrichmentHandler struct {
 	videoRepo   repository.EnrichmentRepository
 	channelRepo repository.ChannelEnrichmentRepository
+	queueClient QueueClient
 	logger      *slog.Logger
+}
+
+// QueueClient interface for enqueueing enrichment tasks
+type QueueClient interface {
+	EnqueueChannelEnrichment(ctx context.Context, channelID string) error
 }
 
 // NewEnrichmentHandler creates a new EnrichmentHandler
@@ -31,6 +38,11 @@ func NewEnrichmentHandler(
 		channelRepo: channelRepo,
 		logger:      logger,
 	}
+}
+
+// SetQueueClient sets the queue client for enqueueing enrichment tasks
+func (h *EnrichmentHandler) SetQueueClient(queueClient QueueClient) {
+	h.queueClient = queueClient
 }
 
 // BatchEnrichmentRequest represents a request for multiple enrichments
@@ -53,9 +65,17 @@ func (h *EnrichmentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.getBatchVideoEnrichments(w, r)
 		return
 	case strings.HasPrefix(path, "/channels/"):
-		channelID := strings.TrimPrefix(path, "/channels/")
-		if channelID != "" && !strings.Contains(channelID, "/") {
-			h.getChannelEnrichment(w, r, channelID)
+		// Handle both GET /channels/{id} and POST /channels/{id}/enqueue
+		pathAfterChannels := strings.TrimPrefix(path, "/channels/")
+		parts := strings.Split(pathAfterChannels, "/")
+
+		if len(parts) == 1 && parts[0] != "" {
+			// GET /channels/{id}
+			h.getChannelEnrichment(w, r, parts[0])
+			return
+		} else if len(parts) == 2 && parts[0] != "" && parts[1] == "enqueue" {
+			// POST /channels/{id}/enqueue
+			h.enqueueChannelEnrichment(w, r, parts[0])
 			return
 		}
 	case path == "/channels/batch" && r.Method == http.MethodPost:
@@ -164,4 +184,39 @@ func (h *EnrichmentHandler) getBatchChannelEnrichments(w http.ResponseWriter, r 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(enrichments)
+}
+
+// enqueueChannelEnrichment enqueues a channel enrichment job
+func (h *EnrichmentHandler) enqueueChannelEnrichment(w http.ResponseWriter, r *http.Request, channelID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check if queue client is available
+	if h.queueClient == nil {
+		h.logger.Error("Queue client not configured",
+			"channel_id", channelID)
+		http.Error(w, "Enrichment queue not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Enqueue the enrichment job
+	if err := h.queueClient.EnqueueChannelEnrichment(r.Context(), channelID); err != nil {
+		h.logger.Error("Failed to enqueue channel enrichment",
+			"channel_id", channelID,
+			"error", err)
+		http.Error(w, "Failed to enqueue enrichment job", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("Channel enrichment job enqueued",
+		"channel_id", channelID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":     "queued",
+		"channel_id": channelID,
+	})
 }

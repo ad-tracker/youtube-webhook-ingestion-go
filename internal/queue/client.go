@@ -107,6 +107,46 @@ func (c *Client) EnqueueVideoEnrichmentBatch(ctx context.Context, videoIDs []str
 	return nil
 }
 
+// EnqueueChannelEnrichment enqueues a channel enrichment task
+func (c *Client) EnqueueChannelEnrichment(ctx context.Context, channelID string) error {
+	// Create payload
+	payload, err := NewEnrichChannelTask(channelID, 0, map[string]interface{}{
+		"source":      "manual",
+		"enqueued_at": time.Now().Format(time.RFC3339),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create task payload: %w", err)
+	}
+
+	// Marshal payload
+	payloadBytes, err := payload.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	// Create asynq task
+	task := asynq.NewTask(TypeEnrichChannel, payloadBytes)
+
+	// Enqueue task
+	info, err := c.asynqClient.Enqueue(task,
+		asynq.MaxRetry(3),
+		asynq.Timeout(5*time.Minute),
+		asynq.Queue("default"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to enqueue task: %w", err)
+	}
+
+	log.Printf("[Queue] Enqueued channel enrichment: channel_id=%s, task_id=%s", channelID, info.ID)
+
+	// Note: We don't record channel enrichment jobs in enrichment_jobs table
+	// because video_id is a required foreign key field. Channel enrichment
+	// jobs are tracked through asynq only.
+	// TODO: Consider adding a migration to make video_id nullable or add channel_id field
+
+	return nil
+}
+
 func strPtr(s string) *string {
 	if s == "" {
 		return nil
