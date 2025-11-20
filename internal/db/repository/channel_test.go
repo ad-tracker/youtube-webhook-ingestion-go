@@ -64,6 +64,28 @@ func TestChannelRepository_UpsertChannel(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "Updated Channel Name", retrieved.Title)
 	})
+
+	t.Run("preserves existing title when upserting with empty title", func(t *testing.T) {
+		td.TruncateTables(t)
+
+		// Create channel with title
+		channel := models.NewChannel("UC123456789", "Original Title", "https://youtube.com/channel/UC123456789")
+		err := repo.UpsertChannel(ctx, channel)
+		require.NoError(t, err)
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Upsert with empty title (simulates webhook scenario)
+		channelWithEmptyTitle := models.NewChannel("UC123456789", "", "https://youtube.com/channel/UC123456789")
+		err = repo.UpsertChannel(ctx, channelWithEmptyTitle)
+		require.NoError(t, err)
+
+		// Verify original title is preserved
+		retrieved, err := repo.GetChannelByID(ctx, "UC123456789")
+		require.NoError(t, err)
+		assert.Equal(t, "Original Title", retrieved.Title)
+		assert.Equal(t, "https://youtube.com/channel/UC123456789", retrieved.ChannelURL)
+	})
 }
 
 func TestChannelRepository_GetChannelByID(t *testing.T) {
