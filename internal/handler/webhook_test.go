@@ -83,7 +83,7 @@ func TestWebhookHandler_HandleNotification_Success(t *testing.T) {
 
 	processor := new(mockProcessor)
 	secret := "test-secret"
-	handler := NewWebhookHandler(processor, secret, nil)
+	handler := NewWebhookHandler(processor, nil, secret, nil)
 
 	atomXML := `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
@@ -118,7 +118,7 @@ func TestWebhookHandler_HandleNotification_ProcessingError(t *testing.T) {
 
 	processor := new(mockProcessor)
 	secret := "test-secret"
-	handler := NewWebhookHandler(processor, secret, nil)
+	handler := NewWebhookHandler(processor, nil, secret, nil)
 
 	atomXML := `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
@@ -153,7 +153,7 @@ func TestWebhookHandler_HandleNotification_WithValidSignature(t *testing.T) {
 
 	processor := new(mockProcessor)
 	secret := "test-secret"
-	handler := NewWebhookHandler(processor, secret, nil)
+	handler := NewWebhookHandler(processor, nil, secret, nil)
 
 	atomXML := `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
@@ -186,7 +186,7 @@ func TestWebhookHandler_HandleNotification_WithInvalidSignature(t *testing.T) {
 
 	processor := new(mockProcessor)
 	secret := "test-secret"
-	handler := NewWebhookHandler(processor, secret, nil)
+	handler := NewWebhookHandler(processor, nil, secret, nil)
 
 	atomXML := `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
@@ -217,7 +217,7 @@ func TestWebhookHandler_HandleNotification_MissingSignature(t *testing.T) {
 
 	processor := new(mockProcessor)
 	secret := "test-secret"
-	handler := NewWebhookHandler(processor, secret, nil)
+	handler := NewWebhookHandler(processor, nil, secret, nil)
 
 	atomXML := `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
@@ -244,7 +244,7 @@ func TestWebhookHandler_HandleNotification_WrongSignatureFormat(t *testing.T) {
 
 	processor := new(mockProcessor)
 	secret := "test-secret"
-	handler := NewWebhookHandler(processor, secret, nil)
+	handler := NewWebhookHandler(processor, nil, secret, nil)
 
 	atomXML := `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
