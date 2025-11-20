@@ -122,7 +122,7 @@ func TestSubscriptionHandler_HandleCreate_Success(t *testing.T) {
 		StatusCode: http.StatusAccepted,
 	}
 	hubService.On("Subscribe", mock.Anything, mock.MatchedBy(func(req *service.SubscribeRequest) bool {
-			return req.LeaseSeconds == reqBody.LeaseSeconds
+		return req.LeaseSeconds == reqBody.LeaseSeconds
 	})).Return(hubResp, nil)
 
 	repo.On("Create", mock.Anything, mock.MatchedBy(func(sub *models.Subscription) bool {
@@ -186,7 +186,7 @@ func TestSubscriptionHandler_HandleCreate_DefaultLeaseSeconds(t *testing.T) {
 	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
-		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
+		ChannelID: "UCxxxxxxxxxxxxxxxxxxxxxx",
 		// LeaseSeconds not specified - should default to 432000
 	}
 	body, _ := json.Marshal(reqBody)
@@ -240,15 +240,14 @@ func TestSubscriptionHandler_HandleCreate_ValidationErrors(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name: "missing channel_id",
-			reqBody: CreateSubscriptionRequest{
-			},
-			errMsg: "channel_id is required",
+			name:    "missing channel_id",
+			reqBody: CreateSubscriptionRequest{},
+			errMsg:  "channel_id is required",
 		},
 		{
 			name: "invalid channel_id format",
 			reqBody: CreateSubscriptionRequest{
-				ChannelID:   "invalid",
+				ChannelID: "invalid",
 			},
 			errMsg: "invalid channel_id format",
 		},
@@ -303,7 +302,7 @@ func TestSubscriptionHandler_HandleCreate_HubSubscriptionFailed(t *testing.T) {
 	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
-		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
+		ChannelID: "UCxxxxxxxxxxxxxxxxxxxxxx",
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -334,7 +333,7 @@ func TestSubscriptionHandler_HandleCreate_DatabaseError(t *testing.T) {
 	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
-		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
+		ChannelID: "UCxxxxxxxxxxxxxxxxxxxxxx",
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -371,7 +370,7 @@ func TestSubscriptionHandler_HandleCreate_DuplicateSubscription(t *testing.T) {
 	handler := NewSubscriptionHandler(repo, hubService, "", "https://example.com/webhook", nil)
 
 	reqBody := CreateSubscriptionRequest{
-		ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
+		ChannelID: "UCxxxxxxxxxxxxxxxxxxxxxx",
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -424,14 +423,14 @@ func TestGetSubscriptionHandler_Success(t *testing.T) {
 
 	subscriptions := []*models.Subscription{
 		{
-			ID:          1,
-			ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
-			Status:      models.StatusActive,
+			ID:        1,
+			ChannelID: "UCxxxxxxxxxxxxxxxxxxxxxx",
+			Status:    models.StatusActive,
 		},
 		{
-			ID:          2,
-			ChannelID:   "UCxxxxxxxxxxxxxxxxxxxxxx",
-			Status:      models.StatusPending,
+			ID:        2,
+			ChannelID: "UCxxxxxxxxxxxxxxxxxxxxxx",
+			Status:    models.StatusPending,
 		},
 	}
 
