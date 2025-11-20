@@ -20,9 +20,13 @@ type Client struct {
 
 // NewClient creates a new queue client
 func NewClient(redisAddr string, jobRepo repository.EnrichmentJobRepository) (*Client, error) {
-	asynqClient := asynq.NewClient(asynq.RedisClientOpt{
-		Addr: redisAddr,
-	})
+	// Parse Redis URL to extract connection details (host, password, db, TLS)
+	redisOpt, err := ParseRedisURL(redisAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse redis URL: %w", err)
+	}
+
+	asynqClient := asynq.NewClient(redisOpt)
 
 	return &Client{
 		asynqClient: asynqClient,
