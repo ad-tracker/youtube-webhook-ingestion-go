@@ -130,7 +130,7 @@ func TestRenewalService_RenewExpiring_Success(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	// Create test subscriptions
@@ -174,7 +174,7 @@ func TestRenewalService_RenewExpiring_NoSubscriptions(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	// Mock repository to return empty list
@@ -199,7 +199,7 @@ func TestRenewalService_RenewExpiring_GetExpiringSoonError(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	// Mock repository to return an error
@@ -225,7 +225,7 @@ func TestRenewalService_RenewExpiring_PartialSuccess(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	// Create test subscriptions
@@ -287,7 +287,7 @@ func TestRenewalService_renewSubscription_Success(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -328,7 +328,7 @@ func TestRenewalService_renewSubscription_HubRejected(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -364,7 +364,7 @@ func TestRenewalService_renewSubscription_HubError(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -399,7 +399,7 @@ func TestRenewalService_renewSubscription_UpdateError(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -436,7 +436,7 @@ func TestRenewalService_renewSubscription_MarkFailedUpdateError(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	subscription := createTestSubscription(1, "UCtest1", 12*time.Hour)
@@ -668,7 +668,7 @@ func TestRenewalService_RenewExpiring_WithSecret(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	subscription := &models.Subscription{
@@ -709,7 +709,7 @@ func TestRenewalService_RenewExpiring_WithoutSecret(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	subscription := &models.Subscription{
@@ -750,7 +750,7 @@ func TestRenewalService_RenewExpiring_ContextCancellation(t *testing.T) {
 		hubService: hubService,
 		logger:     newTestLogger(),
 		batchSize:  100,
-		webhookURL:    "https://example.com/webhook",
+		webhookURL: "https://example.com/webhook",
 	}
 
 	// Create a cancelled context
