@@ -138,9 +138,15 @@ type Server struct {
 }
 
 // NewServer creates a new task processing server
-func NewServer(redisAddr string, concurrency int, handler *EnrichmentHandler) *Server {
+func NewServer(redisAddr string, concurrency int, handler *EnrichmentHandler) (*Server, error) {
+	// Parse Redis URL to extract connection details (host, password, db, TLS)
+	redisOpt, err := ParseRedisURL(redisAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse redis URL: %w", err)
+	}
+
 	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: redisAddr},
+		redisOpt,
 		asynq.Config{
 			Concurrency: concurrency,
 			Queues: map[string]int{
@@ -162,7 +168,7 @@ func NewServer(redisAddr string, concurrency int, handler *EnrichmentHandler) *S
 	return &Server{
 		asynqServer: srv,
 		mux:         mux,
-	}
+	}, nil
 }
 
 // Start starts the server

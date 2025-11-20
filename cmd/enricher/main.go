@@ -132,7 +132,11 @@ func main() {
 	)
 
 	// Initialize and start asynq server
-	server := queue.NewServer(config.RedisURL, config.Concurrency, handler)
+	server, err := queue.NewServer(config.RedisURL, config.Concurrency, handler)
+	if err != nil {
+		logger.Error("failed to create queue server", "error", err)
+		os.Exit(1)
+	}
 
 	// Set up graceful shutdown
 	shutdown := make(chan os.Signal, 1)
