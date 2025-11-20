@@ -65,7 +65,7 @@ func (r *channelRepository) UpsertChannel(ctx context.Context, channel *models.C
 		INSERT INTO channels (channel_id, title, channel_url, first_seen_at, last_updated_at, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (channel_id) DO UPDATE
-		SET title = EXCLUDED.title,
+		SET title = CASE WHEN EXCLUDED.title != '' THEN EXCLUDED.title ELSE channels.title END,
 		    channel_url = EXCLUDED.channel_url,
 		    last_updated_at = EXCLUDED.last_updated_at,
 		    updated_at = EXCLUDED.updated_at
