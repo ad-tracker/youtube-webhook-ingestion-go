@@ -10,26 +10,30 @@ import (
 	"net/http"
 	"strings"
 
+	"ad-tracker/youtube-webhook-ingestion/internal/parser"
 	"ad-tracker/youtube-webhook-ingestion/internal/service"
 )
 
 // WebhookHandler handles YouTube PubSubHubbub webhook requests.
 type WebhookHandler struct {
-	processor service.EventProcessor
-	secret    string
-	logger    *slog.Logger
+	processor    service.EventProcessor
+	blockedCache *service.BlockedVideoCache
+	secret       string
+	logger       *slog.Logger
 }
 
 // NewWebhookHandler creates a new webhook handler with the given processor and secret.
 // The secret is required and used for HMAC signature verification of all webhook notifications.
-func NewWebhookHandler(processor service.EventProcessor, secret string, logger *slog.Logger) *WebhookHandler {
+// The blockedCache is optional - if nil, no video blocking will occur.
+func NewWebhookHandler(processor service.EventProcessor, blockedCache *service.BlockedVideoCache, secret string, logger *slog.Logger) *WebhookHandler {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &WebhookHandler{
-		processor: processor,
-		secret:    secret,
-		logger:    logger,
+		processor:    processor,
+		blockedCache: blockedCache,
+		secret:       secret,
+		logger:       logger,
 	}
 }
 
@@ -84,6 +88,32 @@ func (h *WebhookHandler) handleNotification(w http.ResponseWriter, r *http.Reque
 		h.logger.Warn("signature verification failed", "error", err)
 		http.Error(w, "Signature verification failed", http.StatusUnauthorized)
 		return
+	}
+
+	// Check if video is blocked (if cache is available)
+	if h.blockedCache != nil {
+		videoData, err := parser.ParseAtomFeed(string(body))
+		if err != nil {
+			h.logger.Error("failed to parse atom feed for blocking check", "error", err)
+			http.Error(w, "Failed to parse feed", http.StatusBadRequest)
+			return
+		}
+
+		// Check if this video is blocked
+		isBlocked, err := h.blockedCache.IsBlocked(r.Context(), videoData.VideoID)
+		if err != nil {
+			h.logger.Error("failed to check blocked video cache", "error", err, "video_id", videoData.VideoID)
+			// Continue processing even if cache check fails
+		} else if isBlocked {
+			h.logger.Info("ignoring webhook for blocked video",
+				"video_id", videoData.VideoID,
+				"channel_id", videoData.ChannelID,
+				"title", videoData.Title,
+			)
+			// Return 200 OK to acknowledge receipt but don't process
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 	}
 
 	// Process the event

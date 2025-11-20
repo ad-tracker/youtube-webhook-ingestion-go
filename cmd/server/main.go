@@ -20,6 +20,7 @@ import (
 	"ad-tracker/youtube-webhook-ingestion/internal/service/youtube"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -56,6 +57,7 @@ func main() {
 	videoEnrichmentRepo := repository.NewEnrichmentRepository(pool)
 	channelEnrichmentRepo := repository.NewChannelEnrichmentRepository(pool)
 	quotaRepo := repository.NewQuotaRepository(pool)
+	blockedVideoRepo := repository.NewBlockedVideoRepository(pool)
 
 	processor := service.NewEventProcessor(
 		pool,
@@ -65,9 +67,38 @@ func main() {
 		videoUpdateRepo,
 	)
 
-	// Initialize queue client for enrichment (optional)
-	// If Redis URL is configured, set up enrichment job enqueueing
+	// Initialize Redis client and blocked video cache (optional)
+	// If Redis URL is configured, set up both enrichment job enqueueing and blocked video caching
+	var blockedVideoCache *service.BlockedVideoCache
 	if config.RedisURL != "" {
+		// Parse Redis URL for direct Redis client
+		redisOpt, err := redis.ParseURL(config.RedisURL)
+		if err != nil {
+			logger.Warn("failed to parse Redis URL, blocked video caching will not be available",
+				"error", err,
+			)
+		} else {
+			redisClient := redis.NewClient(redisOpt)
+
+			// Test Redis connection
+			if err := redisClient.Ping(ctx).Err(); err != nil {
+				logger.Warn("failed to connect to Redis, blocked video caching will not be available",
+					"error", err,
+				)
+			} else {
+				// Initialize blocked video cache
+				blockedVideoCache = service.NewBlockedVideoCache(redisClient, blockedVideoRepo)
+				if err := blockedVideoCache.LoadFromDB(ctx); err != nil {
+					logger.Warn("failed to load blocked videos into cache",
+						"error", err,
+					)
+				} else {
+					logger.Info("blocked video cache initialized and loaded from database")
+				}
+			}
+		}
+
+		// Initialize queue client for enrichment
 		jobRepo := repository.NewEnrichmentJobRepository(pool)
 		queueClient, err := queue.NewClient(config.RedisURL, jobRepo)
 		if err != nil {
@@ -78,6 +109,8 @@ func main() {
 			processor.SetQueueClient(queueClient)
 			logger.Info("queue client initialized, enrichment jobs will be enqueued for new videos")
 		}
+	} else {
+		logger.Info("Redis URL not configured, blocked video caching and enrichment job enqueueing will not be available")
 	}
 
 	pubSubHubService := service.NewPubSubHubService(&http.Client{}, logger)
@@ -114,7 +147,7 @@ func main() {
 		logger.Info("YouTube API key not configured (YOUTUBE_API_KEY), URL-based channel addition will not be available")
 	}
 
-	webhookHandler := handler.NewWebhookHandler(processor, config.WebhookSecret, logger)
+	webhookHandler := handler.NewWebhookHandler(processor, blockedVideoCache, config.WebhookSecret, logger)
 
 	webhookEventHandler := handler.NewWebhookEventHandler(webhookEventRepo, logger)
 	channelHandler := handler.NewChannelHandler(channelRepo, logger)
@@ -122,6 +155,12 @@ func main() {
 	videoUpdateHandler := handler.NewVideoUpdateHandler(videoUpdateRepo, logger)
 	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, config.WebhookURL, logger)
 	enrichmentHandler := handler.NewEnrichmentHandler(videoEnrichmentRepo, channelEnrichmentRepo, logger)
+
+	// Blocked video handler (only available if Redis is configured)
+	var blockedVideoHandler *handler.BlockedVideoHandler
+	if blockedVideoCache != nil {
+		blockedVideoHandler = handler.NewBlockedVideoHandler(blockedVideoRepo, blockedVideoCache, logger)
+	}
 
 	// Channel from URL handler (only if YouTube API is available)
 	var channelFromURLHandler *handler.ChannelFromURLHandler
@@ -152,6 +191,12 @@ func main() {
 	mux.Handle("/api/v1/subscriptions", authMiddleware.Middleware(subscriptionCRUDHandler))
 	mux.Handle("/api/v1/subscriptions/", authMiddleware.Middleware(subscriptionCRUDHandler))
 	mux.Handle("/api/v1/enrichments/", authMiddleware.Middleware(enrichmentHandler))
+
+	// Blocked videos endpoints (only available if Redis is configured)
+	if blockedVideoHandler != nil {
+		mux.Handle("/api/v1/blocked-videos", authMiddleware.Middleware(blockedVideoHandler))
+		mux.Handle("/api/v1/blocked-videos/", authMiddleware.Middleware(blockedVideoHandler))
+	}
 
 	mux.HandleFunc("/health", handleHealth(pool))
 
