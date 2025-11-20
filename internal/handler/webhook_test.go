@@ -36,7 +36,7 @@ func TestWebhookHandler_ServeHTTP_MethodNotAllowed(t *testing.T) {
 	t.Parallel()
 
 	processor := new(mockProcessor)
-	handler := NewWebhookHandler(processor, "", nil)
+	handler := NewWebhookHandler(processor, nil, "", nil)
 
 	req := httptest.NewRequest(http.MethodPut, "/webhook", nil)
 	rec := httptest.NewRecorder()
@@ -50,7 +50,7 @@ func TestWebhookHandler_HandleVerification_Success(t *testing.T) {
 	t.Parallel()
 
 	processor := new(mockProcessor)
-	handler := NewWebhookHandler(processor, "", nil)
+	handler := NewWebhookHandler(processor, nil, "", nil)
 
 	challenge := "test-challenge-12345"
 	req := httptest.NewRequest(http.MethodGet, "/webhook?hub.challenge="+challenge, nil)
@@ -67,7 +67,7 @@ func TestWebhookHandler_HandleVerification_MissingChallenge(t *testing.T) {
 	t.Parallel()
 
 	processor := new(mockProcessor)
-	handler := NewWebhookHandler(processor, "", nil)
+	handler := NewWebhookHandler(processor, nil, "", nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/webhook", nil)
 	rec := httptest.NewRecorder()
