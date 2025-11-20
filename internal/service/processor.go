@@ -87,6 +87,14 @@ func (p *eventProcessor) ProcessEvent(ctx context.Context, rawXML string) error 
 		return fmt.Errorf("create webhook event: %w", err)
 	}
 
+	// Check if video exists BEFORE processing projections
+	// This is critical for determining if we should enqueue enrichment jobs
+	existingVideo, err := p.videoRepo.GetVideoByID(ctx, videoData.VideoID)
+	if err != nil && !db.IsNotFound(err) {
+		return fmt.Errorf("check if video exists: %w", err)
+	}
+	isNewVideo := (existingVideo == nil)
+
 	// Process projections in a transaction
 	processingErr := p.processProjections(ctx, webhookEvent.ID, videoData)
 
@@ -107,20 +115,17 @@ func (p *eventProcessor) ProcessEvent(ctx context.Context, rawXML string) error 
 
 	// Enqueue enrichment job if queue client is available
 	// Only enqueue for new videos to avoid overwhelming the queue
-	if p.queueClient != nil {
-		// Determine if this is a new video
-		existingVideo, _ := p.videoRepo.GetVideoByID(ctx, videoData.VideoID)
-		updateType := p.determineUpdateType(existingVideo, videoData)
-
-		if updateType == "new_video" {
-			// Enqueue enrichment job (don't fail the webhook if this fails)
-			if err := p.queueClient.EnqueueVideoEnrichment(ctx, videoData.VideoID, videoData.ChannelID, 0); err != nil {
-				log.Printf("[EventProcessor] Failed to enqueue enrichment job for video %s: %v", videoData.VideoID, err)
-				// Don't return error - the video was still processed successfully
-			} else {
-				log.Printf("[EventProcessor] Enqueued enrichment job for new video: %s", videoData.VideoID)
-			}
+	if p.queueClient != nil && isNewVideo {
+		log.Printf("[EventProcessor] New video detected: %s (channel: %s), enqueueing enrichment job", videoData.VideoID, videoData.ChannelID)
+		// Enqueue enrichment job (don't fail the webhook if this fails)
+		if err := p.queueClient.EnqueueVideoEnrichment(ctx, videoData.VideoID, videoData.ChannelID, 0); err != nil {
+			log.Printf("[EventProcessor] Failed to enqueue enrichment job for video %s: %v", videoData.VideoID, err)
+			// Don't return error - the video was still processed successfully
+		} else {
+			log.Printf("[EventProcessor] Successfully enqueued enrichment job for new video: %s", videoData.VideoID)
 		}
+	} else if p.queueClient != nil {
+		log.Printf("[EventProcessor] Video %s already exists, skipping enrichment", videoData.VideoID)
 	}
 
 	return nil
