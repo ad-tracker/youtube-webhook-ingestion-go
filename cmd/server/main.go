@@ -58,6 +58,7 @@ func main() {
 	channelEnrichmentRepo := repository.NewChannelEnrichmentRepository(pool)
 	quotaRepo := repository.NewQuotaRepository(pool)
 	blockedVideoRepo := repository.NewBlockedVideoRepository(pool)
+	enrichmentJobRepo := repository.NewEnrichmentJobRepository(pool)
 
 	processor := service.NewEventProcessor(
 		pool,
@@ -155,6 +156,7 @@ func main() {
 	videoUpdateHandler := handler.NewVideoUpdateHandler(videoUpdateRepo, logger)
 	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, config.WebhookURL, logger)
 	enrichmentHandler := handler.NewEnrichmentHandler(videoEnrichmentRepo, channelEnrichmentRepo, videoRepo, logger)
+	enrichmentJobHandler := handler.NewEnrichmentJobHandler(enrichmentJobRepo, logger)
 
 	// Set queue client on enrichment handler if Redis is configured
 	if config.RedisURL != "" {
@@ -205,6 +207,7 @@ func main() {
 	mux.Handle("/api/v1/subscriptions", authMiddleware.Middleware(subscriptionCRUDHandler))
 	mux.Handle("/api/v1/subscriptions/", authMiddleware.Middleware(subscriptionCRUDHandler))
 	mux.Handle("/api/v1/enrichments/", authMiddleware.Middleware(enrichmentHandler))
+	mux.Handle("/api/v1/jobs", authMiddleware.Middleware(enrichmentJobHandler))
 
 	// Blocked videos endpoints (only available if Redis is configured)
 	if blockedVideoHandler != nil {
