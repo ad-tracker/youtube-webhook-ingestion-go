@@ -72,8 +72,8 @@ func (h *EnrichmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) e
 	}
 
 	// Check quota availability
-	// Estimate: 5 units per video enrichment
-	available, quotaInfo, err := h.quotaManager.CheckQuotaAvailable(ctx, 5)
+	// Official cost: 1 unit per video enrichment (videos.list API call)
+	available, quotaInfo, err := h.quotaManager.CheckQuotaAvailable(ctx, 1)
 	if err != nil {
 		return fmt.Errorf("failed to check quota: %w", err)
 	}

@@ -130,6 +130,9 @@ func main() {
 		} else {
 			quotaManager = quota.NewManager(quotaRepo, 10000, 90)
 
+			// Wire up quota tracking to YouTube client
+			youtubeClient.SetQuotaTracker(quotaManager)
+
 			channelResolverService = service.NewChannelResolverService(
 				youtubeClient,
 				channelRepo,
