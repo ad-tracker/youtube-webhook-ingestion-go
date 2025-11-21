@@ -122,6 +122,7 @@ type APIQuotaUsage struct {
 	OperationsCount   int       `json:"operations_count"`
 	VideosListCalls   int       `json:"videos_list_calls"`
 	ChannelsListCalls int       `json:"channels_list_calls"`
+	SearchListCalls   int       `json:"search_list_calls"` // search.list API calls (100 units each)
 	OtherCalls        int       `json:"other_calls"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`

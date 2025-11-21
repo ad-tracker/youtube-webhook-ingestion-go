@@ -131,6 +131,9 @@ func main() {
 		} else {
 			quotaManager = quota.NewManager(quotaRepo, 10000, 90)
 
+			// Wire up quota tracking to YouTube client
+			youtubeClient.SetQuotaTracker(quotaManager)
+
 			channelResolverService = service.NewChannelResolverService(
 				youtubeClient,
 				channelRepo,
@@ -157,6 +160,20 @@ func main() {
 	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, config.WebhookURL, logger)
 	enrichmentHandler := handler.NewEnrichmentHandler(videoEnrichmentRepo, channelEnrichmentRepo, videoRepo, logger)
 	enrichmentJobHandler := handler.NewEnrichmentJobHandler(enrichmentJobRepo, logger)
+
+	// Set queue client on enrichment handler if Redis is configured
+	if config.RedisURL != "" {
+		jobRepo := repository.NewEnrichmentJobRepository(pool)
+		queueClient, err := queue.NewClient(config.RedisURL, jobRepo)
+		if err != nil {
+			logger.Warn("failed to initialize queue client for enrichment handler",
+				"error", err,
+			)
+		} else {
+			enrichmentHandler.SetQueueClient(queueClient)
+			logger.Info("queue client set on enrichment handler, manual channel enrichment endpoint is available")
+		}
+	}
 
 	// Set queue client on enrichment handler if Redis is configured
 	if config.RedisURL != "" {

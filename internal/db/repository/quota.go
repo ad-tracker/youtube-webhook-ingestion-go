@@ -72,7 +72,7 @@ func (r *quotaRepository) IncrementQuota(ctx context.Context, quotaCost int, ope
 func (r *quotaRepository) GetQuotaForDate(ctx context.Context, date time.Time) (*model.APIQuotaUsage, error) {
 	query := `
 		SELECT id, date, quota_used, quota_limit, operations_count,
-		       videos_list_calls, channels_list_calls, other_calls,
+		       videos_list_calls, channels_list_calls, search_list_calls, other_calls,
 		       created_at, updated_at
 		FROM api_quota_usage
 		WHERE date = $1
@@ -87,6 +87,7 @@ func (r *quotaRepository) GetQuotaForDate(ctx context.Context, date time.Time) (
 		&usage.OperationsCount,
 		&usage.VideosListCalls,
 		&usage.ChannelsListCalls,
+		&usage.SearchListCalls,
 		&usage.OtherCalls,
 		&usage.CreatedAt,
 		&usage.UpdatedAt,
@@ -106,7 +107,7 @@ func (r *quotaRepository) GetQuotaHistory(ctx context.Context, days int) ([]*mod
 
 	query := `
 		SELECT id, date, quota_used, quota_limit, operations_count,
-		       videos_list_calls, channels_list_calls, other_calls,
+		       videos_list_calls, channels_list_calls, search_list_calls, other_calls,
 		       created_at, updated_at
 		FROM api_quota_usage
 		WHERE date >= CURRENT_DATE - INTERVAL '1 day' * $1
@@ -130,6 +131,7 @@ func (r *quotaRepository) GetQuotaHistory(ctx context.Context, days int) ([]*mod
 			&usage.OperationsCount,
 			&usage.VideosListCalls,
 			&usage.ChannelsListCalls,
+			&usage.SearchListCalls,
 			&usage.OtherCalls,
 			&usage.CreatedAt,
 			&usage.UpdatedAt,
