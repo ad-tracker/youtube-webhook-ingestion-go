@@ -68,7 +68,7 @@ func (m *mockEnrichmentJobRepo) GetJobsByStatus(ctx context.Context, status stri
 	return nil, nil
 }
 
-func (m *mockEnrichmentJobRepo) ListJobs(ctx context.Context, filters repository.JobFilters) ([]*model.EnrichmentJob, error) {
+func (m *mockEnrichmentJobRepo) ListJobs(ctx context.Context, filters repository.JobFilters) ([]*model.EnrichmentJob, int, error) {
 	results := make([]*model.EnrichmentJob, 0)
 
 	// Filter by status if specified
@@ -78,19 +78,21 @@ func (m *mockEnrichmentJobRepo) ListJobs(ctx context.Context, filters repository
 		}
 	}
 
+	total := len(results)
+
 	// Apply pagination
 	start := filters.Offset
 	end := filters.Offset + filters.Limit
 
 	if start >= len(results) {
-		return []*model.EnrichmentJob{}, nil
+		return []*model.EnrichmentJob{}, total, nil
 	}
 
 	if end > len(results) {
 		end = len(results)
 	}
 
-	return results[start:end], nil
+	return results[start:end], total, nil
 }
 
 func (m *mockEnrichmentJobRepo) GetJobStats(ctx context.Context) (map[string]int, error) {
@@ -296,9 +298,19 @@ func TestEnrichmentJobHandler_List(t *testing.T) {
 			}
 
 			if tt.expectedStatus == http.StatusOK {
-				var jobs []*model.EnrichmentJob
-				if err := json.NewDecoder(resp.Body).Decode(&jobs); err != nil {
+				var response map[string]interface{}
+				if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
+				}
+
+				// Convert items from interface{} to []*model.EnrichmentJob
+				itemsInterface := response["items"].([]interface{})
+				jobs := make([]*model.EnrichmentJob, len(itemsInterface))
+				for i, item := range itemsInterface {
+					itemBytes, _ := json.Marshal(item)
+					job := &model.EnrichmentJob{}
+					json.Unmarshal(itemBytes, job)
+					jobs[i] = job
 				}
 
 				if tt.checkResponse != nil {
@@ -342,13 +354,14 @@ func TestEnrichmentJobHandler_EmptyResults(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusOK, resp.Code)
 	}
 
-	var jobs []*model.EnrichmentJob
-	if err := json.NewDecoder(resp.Body).Decode(&jobs); err != nil {
+	var response map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if len(jobs) != 0 {
-		t.Errorf("expected 0 jobs, got %d", len(jobs))
+	items := response["items"].([]interface{})
+	if len(items) != 0 {
+		t.Errorf("expected 0 jobs, got %d", len(items))
 	}
 }
 
@@ -381,12 +394,13 @@ func TestEnrichmentJobHandler_StatusFilterNoMatch(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusOK, resp.Code)
 	}
 
-	var jobs []*model.EnrichmentJob
-	if err := json.NewDecoder(resp.Body).Decode(&jobs); err != nil {
+	var response map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if len(jobs) != 0 {
-		t.Errorf("expected 0 jobs for non-matching status, got %d", len(jobs))
+	items := response["items"].([]interface{})
+	if len(items) != 0 {
+		t.Errorf("expected 0 jobs for non-matching status, got %d", len(items))
 	}
 }

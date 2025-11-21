@@ -53,7 +53,7 @@ func (h *EnrichmentJobHandler) handleList(w http.ResponseWriter, r *http.Request
 	}
 
 	// Fetch jobs from repository
-	jobs, err := h.repo.ListJobs(r.Context(), filters)
+	jobs, total, err := h.repo.ListJobs(r.Context(), filters)
 	if err != nil {
 		h.logger.Error("failed to list enrichment jobs",
 			"error", err,
@@ -63,8 +63,14 @@ func (h *EnrichmentJobHandler) handleList(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Return response
-	sendJSON(w, http.StatusOK, jobs)
+	// Return paginated response
+	response := map[string]interface{}{
+		"items":  jobs,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	}
+	sendJSON(w, http.StatusOK, response)
 }
 
 // parseJobLimit parses the limit query parameter with a default of 100 and max of 500

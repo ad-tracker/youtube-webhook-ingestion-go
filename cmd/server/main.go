@@ -175,20 +175,6 @@ func main() {
 		}
 	}
 
-	// Set queue client on enrichment handler if Redis is configured
-	if config.RedisURL != "" {
-		jobRepo := repository.NewEnrichmentJobRepository(pool)
-		queueClient, err := queue.NewClient(config.RedisURL, jobRepo)
-		if err != nil {
-			logger.Warn("failed to initialize queue client for enrichment handler",
-				"error", err,
-			)
-		} else {
-			enrichmentHandler.SetQueueClient(queueClient)
-			logger.Info("queue client set on enrichment handler, manual channel enrichment endpoint is available")
-		}
-	}
-
 	// Blocked video handler (only available if Redis is configured)
 	var blockedVideoHandler *handler.BlockedVideoHandler
 	if blockedVideoCache != nil {
