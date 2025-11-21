@@ -85,10 +85,7 @@ func (r *enrichmentRepository) CreateEnrichment(ctx context.Context, enrichment 
 		RETURNING id, enriched_at, created_at, updated_at
 	`
 
-	// Convert arrays and maps to JSON
-	tagsJSON, _ := json.Marshal(enrichment.Tags)
-	topicCategoriesJSON, _ := json.Marshal(enrichment.TopicCategories)
-	apiPartsJSON, _ := json.Marshal(enrichment.APIPartsRequested)
+	// Convert JSONB fields to JSON (TEXT[] arrays are passed directly to pgx)
 	contentRatingJSON, _ := json.Marshal(enrichment.ContentRating)
 	rawAPIResponseJSON, _ := json.Marshal(enrichment.RawAPIResponse)
 
@@ -117,8 +114,8 @@ func (r *enrichmentRepository) CreateEnrichment(ctx context.Context, enrichment 
 		enrichment.ViewCount, enrichment.LikeCount, enrichment.DislikeCount,
 		enrichment.FavoriteCount, enrichment.CommentCount,
 		// Categorization
-		enrichment.CategoryID, tagsJSON, enrichment.DefaultLanguage,
-		enrichment.DefaultAudioLanguage, topicCategoriesJSON,
+		enrichment.CategoryID, enrichment.Tags, enrichment.DefaultLanguage,
+		enrichment.DefaultAudioLanguage, enrichment.TopicCategories,
 		// Content classification
 		enrichment.PrivacyStatus, enrichment.License, enrichment.Embeddable,
 		enrichment.PublicStatsViewable, enrichment.MadeForKids, enrichment.SelfDeclaredMadeForKids,
@@ -133,7 +130,7 @@ func (r *enrichmentRepository) CreateEnrichment(ctx context.Context, enrichment 
 		contentRatingJSON, enrichment.ChannelTitle,
 		// API metadata
 		enrichedAt, enrichment.APIResponseEtag, enrichment.QuotaCost,
-		apiPartsJSON, rawAPIResponseJSON,
+		enrichment.APIPartsRequested, rawAPIResponseJSON,
 		// Timestamps
 		now, now,
 	).Scan(
@@ -178,7 +175,7 @@ func (r *enrichmentRepository) GetLatestEnrichment(ctx context.Context, videoID 
 	`
 
 	enrichment := &model.VideoEnrichment{}
-	var tagsJSON, topicCategoriesJSON, apiPartsJSON, contentRatingJSON, rawAPIResponseJSON []byte
+	var contentRatingJSON, rawAPIResponseJSON []byte
 
 	err := r.pool.QueryRow(ctx, query, videoID).Scan(
 		&enrichment.ID, &enrichment.VideoID,
@@ -194,8 +191,8 @@ func (r *enrichmentRepository) GetLatestEnrichment(ctx context.Context, videoID 
 		&enrichment.ViewCount, &enrichment.LikeCount, &enrichment.DislikeCount,
 		&enrichment.FavoriteCount, &enrichment.CommentCount,
 		// Categorization
-		&enrichment.CategoryID, &tagsJSON, &enrichment.DefaultLanguage,
-		&enrichment.DefaultAudioLanguage, &topicCategoriesJSON,
+		&enrichment.CategoryID, &enrichment.Tags, &enrichment.DefaultLanguage,
+		&enrichment.DefaultAudioLanguage, &enrichment.TopicCategories,
 		// Content classification
 		&enrichment.PrivacyStatus, &enrichment.License, &enrichment.Embeddable,
 		&enrichment.PublicStatsViewable, &enrichment.MadeForKids, &enrichment.SelfDeclaredMadeForKids,
@@ -210,7 +207,7 @@ func (r *enrichmentRepository) GetLatestEnrichment(ctx context.Context, videoID 
 		&contentRatingJSON, &enrichment.ChannelTitle,
 		// API metadata
 		&enrichment.EnrichedAt, &enrichment.APIResponseEtag, &enrichment.QuotaCost,
-		&apiPartsJSON, &rawAPIResponseJSON,
+		&enrichment.APIPartsRequested, &rawAPIResponseJSON,
 		// Timestamps
 		&enrichment.CreatedAt, &enrichment.UpdatedAt,
 	)
@@ -222,10 +219,7 @@ func (r *enrichmentRepository) GetLatestEnrichment(ctx context.Context, videoID 
 		return nil, db.WrapError(err, "get latest enrichment")
 	}
 
-	// Unmarshal JSON fields
-	json.Unmarshal(tagsJSON, &enrichment.Tags)
-	json.Unmarshal(topicCategoriesJSON, &enrichment.TopicCategories)
-	json.Unmarshal(apiPartsJSON, &enrichment.APIPartsRequested)
+	// Unmarshal JSONB fields (TEXT[] arrays are scanned directly by pgx)
 	json.Unmarshal(contentRatingJSON, &enrichment.ContentRating)
 	json.Unmarshal(rawAPIResponseJSON, &enrichment.RawAPIResponse)
 
@@ -401,7 +395,7 @@ func (r *enrichmentRepository) GetBatchLatestEnrichments(ctx context.Context, vi
 	enrichments := make(map[string]*model.VideoEnrichment)
 	for rows.Next() {
 		enrichment := &model.VideoEnrichment{}
-		var tagsJSON, topicCategoriesJSON, apiPartsJSON, contentRatingJSON, rawAPIResponseJSON []byte
+		var contentRatingJSON, rawAPIResponseJSON []byte
 
 		err := rows.Scan(
 			&enrichment.ID, &enrichment.VideoID,
@@ -417,8 +411,8 @@ func (r *enrichmentRepository) GetBatchLatestEnrichments(ctx context.Context, vi
 			&enrichment.ViewCount, &enrichment.LikeCount, &enrichment.DislikeCount,
 			&enrichment.FavoriteCount, &enrichment.CommentCount,
 			// Categorization
-			&enrichment.CategoryID, &tagsJSON, &enrichment.DefaultLanguage,
-			&enrichment.DefaultAudioLanguage, &topicCategoriesJSON,
+			&enrichment.CategoryID, &enrichment.Tags, &enrichment.DefaultLanguage,
+			&enrichment.DefaultAudioLanguage, &enrichment.TopicCategories,
 			// Content classification
 			&enrichment.PrivacyStatus, &enrichment.License, &enrichment.Embeddable,
 			&enrichment.PublicStatsViewable, &enrichment.MadeForKids, &enrichment.SelfDeclaredMadeForKids,
@@ -433,7 +427,7 @@ func (r *enrichmentRepository) GetBatchLatestEnrichments(ctx context.Context, vi
 			&contentRatingJSON, &enrichment.ChannelTitle,
 			// API metadata
 			&enrichment.EnrichedAt, &enrichment.APIResponseEtag, &enrichment.QuotaCost,
-			&apiPartsJSON, &rawAPIResponseJSON,
+			&enrichment.APIPartsRequested, &rawAPIResponseJSON,
 			// Timestamps
 			&enrichment.CreatedAt, &enrichment.UpdatedAt,
 		)
@@ -442,10 +436,7 @@ func (r *enrichmentRepository) GetBatchLatestEnrichments(ctx context.Context, vi
 			return nil, db.WrapError(err, "scan batch enrichment")
 		}
 
-		// Unmarshal JSON fields
-		json.Unmarshal(tagsJSON, &enrichment.Tags)
-		json.Unmarshal(topicCategoriesJSON, &enrichment.TopicCategories)
-		json.Unmarshal(apiPartsJSON, &enrichment.APIPartsRequested)
+		// Unmarshal JSONB fields (TEXT[] arrays are scanned directly by pgx)
 		json.Unmarshal(contentRatingJSON, &enrichment.ContentRating)
 		json.Unmarshal(rawAPIResponseJSON, &enrichment.RawAPIResponse)
 
@@ -505,9 +496,7 @@ func (r *channelEnrichmentRepository) Create(ctx context.Context, enrichment *mo
 		RETURNING id, enriched_at, created_at, updated_at
 	`
 
-	// Convert arrays and maps to JSON
-	topicCategoriesJSON, _ := json.Marshal(enrichment.TopicCategories)
-	apiPartsJSON, _ := json.Marshal(enrichment.APIPartsRequested)
+	// Convert JSONB fields to JSON (TEXT[] arrays are passed directly to pgx)
 	rawAPIResponseJSON, _ := json.Marshal(enrichment.RawAPIResponse)
 
 	now := time.Now()
@@ -539,7 +528,7 @@ func (r *channelEnrichmentRepository) Create(ctx context.Context, enrichment *mo
 		enrichment.RelatedPlaylistsUploads,
 		enrichment.RelatedPlaylistsFavorites,
 		// Topics
-		topicCategoriesJSON,
+		enrichment.TopicCategories,
 		// Status
 		enrichment.PrivacyStatus,
 		enrichment.IsLinked,
@@ -549,7 +538,7 @@ func (r *channelEnrichmentRepository) Create(ctx context.Context, enrichment *mo
 		enrichedAt,
 		enrichment.APIResponseEtag,
 		enrichment.QuotaCost,
-		apiPartsJSON,
+		enrichment.APIPartsRequested,
 		rawAPIResponseJSON,
 		// Timestamps
 		now, now,
@@ -586,7 +575,7 @@ func (r *channelEnrichmentRepository) GetLatest(ctx context.Context, channelID s
 	`
 
 	enrichment := &model.ChannelEnrichment{}
-	var topicCategoriesJSON, apiPartsJSON, rawAPIResponseJSON []byte
+	var rawAPIResponseJSON []byte
 
 	err := r.pool.QueryRow(ctx, query, channelID).Scan(
 		&enrichment.ID,
@@ -612,7 +601,7 @@ func (r *channelEnrichmentRepository) GetLatest(ctx context.Context, channelID s
 		&enrichment.RelatedPlaylistsUploads,
 		&enrichment.RelatedPlaylistsFavorites,
 		// Topics
-		&topicCategoriesJSON,
+		&enrichment.TopicCategories,
 		// Status
 		&enrichment.PrivacyStatus,
 		&enrichment.IsLinked,
@@ -622,7 +611,7 @@ func (r *channelEnrichmentRepository) GetLatest(ctx context.Context, channelID s
 		&enrichment.EnrichedAt,
 		&enrichment.APIResponseEtag,
 		&enrichment.QuotaCost,
-		&apiPartsJSON,
+		&enrichment.APIPartsRequested,
 		&rawAPIResponseJSON,
 		// Timestamps
 		&enrichment.CreatedAt,
@@ -636,9 +625,7 @@ func (r *channelEnrichmentRepository) GetLatest(ctx context.Context, channelID s
 		return nil, db.WrapError(err, "get latest channel enrichment")
 	}
 
-	// Unmarshal JSON fields
-	json.Unmarshal(topicCategoriesJSON, &enrichment.TopicCategories)
-	json.Unmarshal(apiPartsJSON, &enrichment.APIPartsRequested)
+	// Unmarshal JSONB fields (TEXT[] arrays are scanned directly by pgx)
 	json.Unmarshal(rawAPIResponseJSON, &enrichment.RawAPIResponse)
 
 	return enrichment, nil
@@ -721,7 +708,7 @@ func (r *channelEnrichmentRepository) GetBatchLatest(ctx context.Context, channe
 	enrichments := make(map[string]*model.ChannelEnrichment)
 	for rows.Next() {
 		enrichment := &model.ChannelEnrichment{}
-		var topicCategoriesJSON, apiPartsJSON, rawAPIResponseJSON []byte
+		var rawAPIResponseJSON []byte
 
 		err := rows.Scan(
 			&enrichment.ID,
@@ -747,7 +734,7 @@ func (r *channelEnrichmentRepository) GetBatchLatest(ctx context.Context, channe
 			&enrichment.RelatedPlaylistsUploads,
 			&enrichment.RelatedPlaylistsFavorites,
 			// Topics
-			&topicCategoriesJSON,
+			&enrichment.TopicCategories,
 			// Status
 			&enrichment.PrivacyStatus,
 			&enrichment.IsLinked,
@@ -757,7 +744,7 @@ func (r *channelEnrichmentRepository) GetBatchLatest(ctx context.Context, channe
 			&enrichment.EnrichedAt,
 			&enrichment.APIResponseEtag,
 			&enrichment.QuotaCost,
-			&apiPartsJSON,
+			&enrichment.APIPartsRequested,
 			&rawAPIResponseJSON,
 			// Timestamps
 			&enrichment.CreatedAt,
@@ -768,9 +755,7 @@ func (r *channelEnrichmentRepository) GetBatchLatest(ctx context.Context, channe
 			return nil, db.WrapError(err, "scan batch channel enrichment")
 		}
 
-		// Unmarshal JSON fields
-		json.Unmarshal(topicCategoriesJSON, &enrichment.TopicCategories)
-		json.Unmarshal(apiPartsJSON, &enrichment.APIPartsRequested)
+		// Unmarshal JSONB fields (TEXT[] arrays are scanned directly by pgx)
 		json.Unmarshal(rawAPIResponseJSON, &enrichment.RawAPIResponse)
 
 		enrichments[enrichment.ChannelID] = enrichment
