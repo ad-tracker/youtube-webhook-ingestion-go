@@ -85,10 +85,7 @@ func (r *enrichmentRepository) CreateEnrichment(ctx context.Context, enrichment 
 		RETURNING id, enriched_at, created_at, updated_at
 	`
 
-	// Convert arrays and maps to JSON
-	tagsJSON, _ := json.Marshal(enrichment.Tags)
-	topicCategoriesJSON, _ := json.Marshal(enrichment.TopicCategories)
-	apiPartsJSON, _ := json.Marshal(enrichment.APIPartsRequested)
+	// Convert JSONB fields to JSON (TEXT[] arrays are passed directly to pgx)
 	contentRatingJSON, _ := json.Marshal(enrichment.ContentRating)
 	rawAPIResponseJSON, _ := json.Marshal(enrichment.RawAPIResponse)
 
@@ -117,8 +114,8 @@ func (r *enrichmentRepository) CreateEnrichment(ctx context.Context, enrichment 
 		enrichment.ViewCount, enrichment.LikeCount, enrichment.DislikeCount,
 		enrichment.FavoriteCount, enrichment.CommentCount,
 		// Categorization
-		enrichment.CategoryID, tagsJSON, enrichment.DefaultLanguage,
-		enrichment.DefaultAudioLanguage, topicCategoriesJSON,
+		enrichment.CategoryID, enrichment.Tags, enrichment.DefaultLanguage,
+		enrichment.DefaultAudioLanguage, enrichment.TopicCategories,
 		// Content classification
 		enrichment.PrivacyStatus, enrichment.License, enrichment.Embeddable,
 		enrichment.PublicStatsViewable, enrichment.MadeForKids, enrichment.SelfDeclaredMadeForKids,
@@ -133,7 +130,7 @@ func (r *enrichmentRepository) CreateEnrichment(ctx context.Context, enrichment 
 		contentRatingJSON, enrichment.ChannelTitle,
 		// API metadata
 		enrichedAt, enrichment.APIResponseEtag, enrichment.QuotaCost,
-		apiPartsJSON, rawAPIResponseJSON,
+		enrichment.APIPartsRequested, rawAPIResponseJSON,
 		// Timestamps
 		now, now,
 	).Scan(
@@ -505,9 +502,7 @@ func (r *channelEnrichmentRepository) Create(ctx context.Context, enrichment *mo
 		RETURNING id, enriched_at, created_at, updated_at
 	`
 
-	// Convert arrays and maps to JSON
-	topicCategoriesJSON, _ := json.Marshal(enrichment.TopicCategories)
-	apiPartsJSON, _ := json.Marshal(enrichment.APIPartsRequested)
+	// Convert JSONB fields to JSON (TEXT[] arrays are passed directly to pgx)
 	rawAPIResponseJSON, _ := json.Marshal(enrichment.RawAPIResponse)
 
 	now := time.Now()
@@ -539,7 +534,7 @@ func (r *channelEnrichmentRepository) Create(ctx context.Context, enrichment *mo
 		enrichment.RelatedPlaylistsUploads,
 		enrichment.RelatedPlaylistsFavorites,
 		// Topics
-		topicCategoriesJSON,
+		enrichment.TopicCategories,
 		// Status
 		enrichment.PrivacyStatus,
 		enrichment.IsLinked,
@@ -549,7 +544,7 @@ func (r *channelEnrichmentRepository) Create(ctx context.Context, enrichment *mo
 		enrichedAt,
 		enrichment.APIResponseEtag,
 		enrichment.QuotaCost,
-		apiPartsJSON,
+		enrichment.APIPartsRequested,
 		rawAPIResponseJSON,
 		// Timestamps
 		now, now,
