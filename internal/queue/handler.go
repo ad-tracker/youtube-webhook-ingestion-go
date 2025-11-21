@@ -16,12 +16,12 @@ import (
 
 // EnrichmentHandler handles video enrichment tasks
 type EnrichmentHandler struct {
-	youtubeClient        *youtube.Client
-	quotaManager         *quota.Manager
-	enrichmentRepo       repository.EnrichmentRepository
+	youtubeClient         *youtube.Client
+	quotaManager          *quota.Manager
+	enrichmentRepo        repository.EnrichmentRepository
 	channelEnrichmentRepo repository.ChannelEnrichmentRepository
-	jobRepo              repository.EnrichmentJobRepository
-	batchSize            int
+	jobRepo               repository.EnrichmentJobRepository
+	batchSize             int
 }
 
 // NewEnrichmentHandler creates a new enrichment task handler
@@ -38,12 +38,12 @@ func NewEnrichmentHandler(
 	}
 
 	return &EnrichmentHandler{
-		youtubeClient:        youtubeClient,
-		quotaManager:         quotaManager,
-		enrichmentRepo:       enrichmentRepo,
+		youtubeClient:         youtubeClient,
+		quotaManager:          quotaManager,
+		enrichmentRepo:        enrichmentRepo,
 		channelEnrichmentRepo: channelEnrichmentRepo,
-		jobRepo:              jobRepo,
-		batchSize:            batchSize,
+		jobRepo:               jobRepo,
+		batchSize:             batchSize,
 	}
 }
 
