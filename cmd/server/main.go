@@ -154,7 +154,7 @@ func main() {
 	videoHandler := handler.NewVideoHandler(videoRepo, logger)
 	videoUpdateHandler := handler.NewVideoUpdateHandler(videoUpdateRepo, logger)
 	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, config.WebhookURL, logger)
-	enrichmentHandler := handler.NewEnrichmentHandler(videoEnrichmentRepo, channelEnrichmentRepo, logger)
+	enrichmentHandler := handler.NewEnrichmentHandler(videoEnrichmentRepo, channelEnrichmentRepo, videoRepo, logger)
 
 	// Set queue client on enrichment handler if Redis is configured
 	if config.RedisURL != "" {
