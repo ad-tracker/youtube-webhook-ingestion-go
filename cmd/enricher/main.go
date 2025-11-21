@@ -94,6 +94,9 @@ func main() {
 	// Initialize quota manager
 	quotaManager := quota.NewManager(quotaRepo, config.DailyQuota, config.QuotaThreshold)
 
+	// Wire up quota tracking to YouTube client
+	youtubeClient.SetQuotaTracker(quotaManager)
+
 	// Check initial quota status
 	quotaInfo, err := quotaManager.GetQuotaInfo(ctx)
 	if err != nil {

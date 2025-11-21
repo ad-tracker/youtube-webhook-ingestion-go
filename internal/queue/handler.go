@@ -72,8 +72,8 @@ func (h *EnrichmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) e
 	}
 
 	// Check quota availability
-	// Estimate: 5 units per video enrichment
-	available, quotaInfo, err := h.quotaManager.CheckQuotaAvailable(ctx, 5)
+	// Official cost: 1 unit per video enrichment (videos.list API call)
+	available, quotaInfo, err := h.quotaManager.CheckQuotaAvailable(ctx, 1)
 	if err != nil {
 		return fmt.Errorf("failed to check quota: %w", err)
 	}
@@ -114,11 +114,9 @@ func (h *EnrichmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) e
 		return fmt.Errorf("failed to store enrichment: %w", err)
 	}
 
-	// Record quota usage
-	if err := h.quotaManager.RecordQuotaUsage(ctx, quotaCost, "videos_list"); err != nil {
-		log.Printf("[Handler] Warning: failed to record quota usage: %v", err)
-		// Don't fail the task for quota tracking errors
-	}
+	// Note: Quota tracking is now handled automatically by the YouTube client
+	// when FetchVideos() is called (via the QuotaTracker interface),
+	// so we don't need to manually record quota usage here to avoid double-counting.
 
 	// Mark job as completed
 	if job != nil {
@@ -196,11 +194,9 @@ func (h *EnrichmentHandler) HandleEnrichChannelTask() asynq.HandlerFunc {
 			return fmt.Errorf("failed to store channel enrichment: %w", err)
 		}
 
-		// Record quota usage (1 unit for channels.list)
-		if err := h.quotaManager.RecordQuotaUsage(ctx, 1, "channels_list"); err != nil {
-			log.Printf("[Handler] Warning: failed to record quota usage: %v", err)
-			// Don't fail the task for quota tracking errors
-		}
+		// Note: Quota tracking is now handled automatically by the YouTube client
+		// when GetChannelDetails() is called (via the QuotaTracker interface),
+		// so we don't need to manually record quota usage here to avoid double-counting.
 
 		// Mark job as completed
 		if job != nil {
@@ -209,7 +205,7 @@ func (h *EnrichmentHandler) HandleEnrichChannelTask() asynq.HandlerFunc {
 			}
 		}
 
-		log.Printf("[Handler] Successfully enriched channel: channel_id=%s, quota_cost=1", payload.ChannelID)
+		log.Printf("[Handler] Successfully enriched channel: channel_id=%s", payload.ChannelID)
 		return nil
 	}
 }
