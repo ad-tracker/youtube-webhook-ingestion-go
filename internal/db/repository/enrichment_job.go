@@ -52,8 +52,8 @@ type EnrichmentJobRepository interface {
 	// GetJobsByStatus retrieves jobs by status
 	GetJobsByStatus(ctx context.Context, status string, limit int) ([]*model.EnrichmentJob, error)
 
-	// ListJobs retrieves jobs with optional filters
-	ListJobs(ctx context.Context, filters JobFilters) ([]*model.EnrichmentJob, error)
+	// ListJobs retrieves jobs with optional filters, returns jobs and total count
+	ListJobs(ctx context.Context, filters JobFilters) ([]*model.EnrichmentJob, int, error)
 
 	// GetJobStats retrieves job statistics
 	GetJobStats(ctx context.Context) (map[string]int, error)
@@ -344,7 +344,7 @@ func (r *enrichmentJobRepository) GetJobsByStatus(ctx context.Context, status st
 	return jobs, nil
 }
 
-func (r *enrichmentJobRepository) ListJobs(ctx context.Context, filters JobFilters) ([]*model.EnrichmentJob, error) {
+func (r *enrichmentJobRepository) ListJobs(ctx context.Context, filters JobFilters) ([]*model.EnrichmentJob, int, error) {
 	// Set defaults
 	if filters.Limit <= 0 {
 		filters.Limit = 100
@@ -353,6 +353,23 @@ func (r *enrichmentJobRepository) ListJobs(ctx context.Context, filters JobFilte
 		filters.Offset = 0
 	}
 
+	// Build WHERE clause for both queries
+	whereClause := ""
+	countArgs := make([]interface{}, 0)
+	if filters.Status != "" {
+		whereClause = " WHERE status = $1"
+		countArgs = append(countArgs, filters.Status)
+	}
+
+	// Get total count
+	countQuery := "SELECT COUNT(*)::int FROM enrichment_jobs" + whereClause
+	var total int
+	err := r.pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
+	if err != nil {
+		return nil, 0, db.WrapError(err, "count jobs")
+	}
+
+	// Build main query
 	query := `
 		SELECT id, asynq_task_id, job_type, video_id, status, priority,
 		       scheduled_at, started_at, completed_at,
@@ -360,28 +377,21 @@ func (r *enrichmentJobRepository) ListJobs(ctx context.Context, filters JobFilte
 		       error_message, error_stack_trace, metadata,
 		       created_at, updated_at
 		FROM enrichment_jobs
-	`
-
-	args := make([]interface{}, 0)
-	argIndex := 1
-
-	// Add status filter if provided
-	if filters.Status != "" {
-		query += " WHERE status = $" + fmt.Sprintf("%d", argIndex)
-		args = append(args, filters.Status)
-		argIndex++
-	}
+	` + whereClause
 
 	// Order by created_at DESC
 	query += " ORDER BY created_at DESC"
 
 	// Add limit and offset
+	args := make([]interface{}, 0)
+	args = append(args, countArgs...)
+	argIndex := len(args) + 1
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
 	args = append(args, filters.Limit, filters.Offset)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, db.WrapError(err, "list jobs")
+		return nil, 0, db.WrapError(err, "list jobs")
 	}
 	defer rows.Close()
 
@@ -399,7 +409,7 @@ func (r *enrichmentJobRepository) ListJobs(ctx context.Context, filters JobFilte
 			&job.CreatedAt, &job.UpdatedAt,
 		)
 		if err != nil {
-			return nil, db.WrapError(err, "scan job")
+			return nil, 0, db.WrapError(err, "scan job")
 		}
 
 		if len(metadataJSON) > 0 {
@@ -410,10 +420,10 @@ func (r *enrichmentJobRepository) ListJobs(ctx context.Context, filters JobFilte
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, db.WrapError(err, "iterate jobs")
+		return nil, 0, db.WrapError(err, "iterate jobs")
 	}
 
-	return jobs, nil
+	return jobs, total, nil
 }
 
 func (r *enrichmentJobRepository) GetJobStats(ctx context.Context) (map[string]int, error) {
