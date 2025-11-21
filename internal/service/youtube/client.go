@@ -86,6 +86,14 @@ func (c *Client) FetchVideos(ctx context.Context, videoIDs []string) ([]*model.V
 	// Source: https://developers.google.com/youtube/v3/determine_quota_cost
 	quotaCost := 1
 
+	// Track quota usage for Videos.List API call
+	// Per Google documentation: videos.list costs 1 unit
+	if c.quotaTracker != nil {
+		if err := c.quotaTracker.RecordQuotaUsage(ctx, quotaCost, "videos_list"); err != nil {
+			log.Printf("[YouTube Client] Warning: failed to record videos.list quota usage: %v", err)
+		}
+	}
+
 	enrichments := make([]*model.VideoEnrichment, 0, len(response.Items))
 
 	for _, item := range response.Items {

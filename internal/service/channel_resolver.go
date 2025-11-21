@@ -113,15 +113,11 @@ func (s *ChannelResolverService) ResolveChannelFromURL(ctx context.Context, req 
 		// Don't fail the entire operation if enrichment storage fails
 	}
 
-	// Step 5: Track quota usage
-	if s.quotaManager != nil {
-		err = s.quotaManager.RecordQuotaUsage(ctx, ytEnrichment.QuotaCost, "channels_list")
-		if err != nil {
-			log.Printf("[ChannelResolver] Warning: Failed to track quota: %v", err)
-		}
-	}
+	// Note: Quota tracking is now handled automatically by the YouTube client
+	// when API calls are made (via the QuotaTracker interface), so we don't
+	// need to manually record quota usage here to avoid double-counting.
 
-	// Step 6: Create PubSubHubbub subscription (always create with configured webhook URL)
+	// Step 5: Create PubSubHubbub subscription (always create with configured webhook URL)
 	subscription, err := s.createSubscription(ctx, ytEnrichment.ChannelID)
 	if err != nil {
 		log.Printf("[ChannelResolver] Warning: Failed to create subscription: %v", err)
