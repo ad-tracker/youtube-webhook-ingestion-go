@@ -59,6 +59,7 @@ func main() {
 	quotaRepo := repository.NewQuotaRepository(pool)
 	blockedVideoRepo := repository.NewBlockedVideoRepository(pool)
 	enrichmentJobRepo := repository.NewEnrichmentJobRepository(pool)
+	sponsorDetectionRepo := repository.NewSponsorDetectionRepository(pool)
 
 	processor := service.NewEventProcessor(
 		pool,
@@ -160,6 +161,10 @@ func main() {
 	subscriptionCRUDHandler := handler.NewSubscriptionCRUDHandler(subscriptionRepo, pubSubHubService, config.WebhookSecret, config.WebhookURL, logger)
 	enrichmentHandler := handler.NewEnrichmentHandler(videoEnrichmentRepo, channelEnrichmentRepo, videoRepo, logger)
 	enrichmentJobHandler := handler.NewEnrichmentJobHandler(enrichmentJobRepo, logger)
+	sponsorHandler := handler.NewSponsorHandler(sponsorDetectionRepo, videoRepo, logger)
+	videoSponsorHandler := handler.NewVideoSponsorHandler(sponsorDetectionRepo, logger)
+	channelSponsorHandler := handler.NewChannelSponsorHandler(sponsorDetectionRepo, videoRepo, logger)
+	sponsorDetectionJobHandler := handler.NewSponsorDetectionJobHandler(sponsorDetectionRepo, logger)
 
 	// Set queue client on enrichment handler if Redis is configured
 	if config.RedisURL != "" {
@@ -210,15 +215,7 @@ func main() {
 	mux.Handle("/api/v1/webhook-events", authMiddleware.Middleware(webhookEventHandler))
 	mux.Handle("/api/v1/webhook-events/", authMiddleware.Middleware(webhookEventHandler))
 	mux.Handle("/api/v1/channels", authMiddleware.Middleware(channelHandler))
-	mux.Handle("/api/v1/channels/", authMiddleware.Middleware(channelHandler))
-
-	// Channel from URL endpoint (only available if YouTube API is configured)
-	if channelFromURLHandler != nil {
-		mux.Handle("/api/v1/channels/from-url", authMiddleware.Middleware(http.HandlerFunc(channelFromURLHandler.HandleCreateFromURL)))
-	}
-
 	mux.Handle("/api/v1/videos", authMiddleware.Middleware(videoHandler))
-	mux.Handle("/api/v1/videos/", authMiddleware.Middleware(videoHandler))
 	mux.Handle("/api/v1/video-updates", authMiddleware.Middleware(videoUpdateHandler))
 	mux.Handle("/api/v1/video-updates/", authMiddleware.Middleware(videoUpdateHandler))
 	mux.Handle("/api/v1/subscriptions", authMiddleware.Middleware(subscriptionCRUDHandler))
@@ -231,6 +228,50 @@ func main() {
 		mux.Handle("/api/v1/blocked-videos", authMiddleware.Middleware(blockedVideoHandler))
 		mux.Handle("/api/v1/blocked-videos/", authMiddleware.Middleware(blockedVideoHandler))
 	}
+
+	// Sponsor detection endpoints
+	mux.Handle("/api/v1/sponsors", authMiddleware.Middleware(sponsorHandler))
+	mux.Handle("/api/v1/sponsors/", authMiddleware.Middleware(sponsorHandler))
+	mux.Handle("/api/v1/sponsor-detection-jobs", authMiddleware.Middleware(sponsorDetectionJobHandler))
+	mux.Handle("/api/v1/sponsor-detection-jobs/", authMiddleware.Middleware(sponsorDetectionJobHandler))
+
+	// Nested sponsor endpoints for videos and channels
+	// We need to create wrapper handlers for these nested routes
+	mux.Handle("/api/v1/videos/", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/v1/videos/")
+		parts := strings.Split(path, "/")
+
+		// Check if this is a /videos/{id}/sponsors request
+		if len(parts) == 2 && parts[1] == "sponsors" {
+			videoID := parts[0]
+			videoSponsorHandler.HandleGetVideoSponsors(w, r, videoID)
+			return
+		}
+
+		// Otherwise, delegate to the video handler
+		videoHandler.ServeHTTP(w, r)
+	})))
+
+	mux.Handle("/api/v1/channels/", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/v1/channels/")
+		parts := strings.Split(path, "/")
+
+		// Check if this is /channels/from-url (if YouTube API is available)
+		if parts[0] == "from-url" && channelFromURLHandler != nil {
+			channelFromURLHandler.HandleCreateFromURL(w, r)
+			return
+		}
+
+		// Check if this is a /channels/{id}/sponsors request
+		if len(parts) == 2 && parts[1] == "sponsors" {
+			channelID := parts[0]
+			channelSponsorHandler.HandleGetChannelSponsors(w, r, channelID)
+			return
+		}
+
+		// Otherwise, delegate to the channel handler
+		channelHandler.ServeHTTP(w, r)
+	})))
 
 	mux.HandleFunc("/health", handleHealth(pool))
 
