@@ -66,9 +66,15 @@ func (m *mockSponsorDetectionRepo) IncrementSponsorVideoCount(ctx context.Contex
 	return nil
 }
 
-func (m *mockSponsorDetectionRepo) ListSponsors(ctx context.Context, sortBy string, limit, offset int) ([]*models.Sponsor, error) {
+func (m *mockSponsorDetectionRepo) ListSponsors(ctx context.Context, sortBy string, order string, category string, limit, offset int) ([]*models.Sponsor, error) {
 	var results []*models.Sponsor
 	for _, sponsor := range m.sponsors {
+		// Apply category filter if specified
+		if category != "" {
+			if sponsor.Category == nil || *sponsor.Category != category {
+				continue
+			}
+		}
 		results = append(results, sponsor)
 	}
 

@@ -29,7 +29,7 @@ type SponsorDetectionRepository interface {
 	CreateSponsor(ctx context.Context, sponsor *models.Sponsor) error
 	UpdateSponsorLastSeen(ctx context.Context, sponsorID uuid.UUID, timestamp time.Time) error
 	IncrementSponsorVideoCount(ctx context.Context, sponsorID uuid.UUID) error
-	ListSponsors(ctx context.Context, sortBy string, limit, offset int) ([]*models.Sponsor, error)
+	ListSponsors(ctx context.Context, sortBy string, order string, category string, limit, offset int) ([]*models.Sponsor, error)
 	GetSponsorByID(ctx context.Context, sponsorID uuid.UUID) (*models.Sponsor, error)
 
 	// Detection job operations
@@ -315,30 +315,54 @@ func (r *sponsorDetectionRepository) IncrementSponsorVideoCount(ctx context.Cont
 	return nil
 }
 
-// ListSponsors retrieves sponsors with pagination and sorting
-func (r *sponsorDetectionRepository) ListSponsors(ctx context.Context, sortBy string, limit, offset int) ([]*models.Sponsor, error) {
-	// Validate sortBy to prevent SQL injection
-	validSorts := map[string]string{
-		"video_count": "video_count DESC",
-		"name":        "name ASC",
-		"last_seen":   "last_seen_at DESC",
-		"created":     "created_at DESC",
+// ListSponsors retrieves sponsors with pagination, sorting, and optional category filter
+func (r *sponsorDetectionRepository) ListSponsors(ctx context.Context, sortBy string, order string, category string, limit, offset int) ([]*models.Sponsor, error) {
+	// Validate and build sort field
+	validSortFields := map[string]string{
+		"video_count": "video_count",
+		"name":        "name",
+		"last_seen":   "last_seen_at",
+		"created":     "created_at",
 	}
 
-	orderBy, ok := validSorts[sortBy]
+	sortField, ok := validSortFields[sortBy]
 	if !ok {
-		orderBy = validSorts["video_count"] // Default sort
+		sortField = validSortFields["video_count"] // Default sort field
 	}
 
-	query := fmt.Sprintf(`
-		SELECT id, name, normalized_name, category, website_url, description,
-		       first_seen_at, last_seen_at, video_count, created_at, updated_at
-		FROM sponsors
-		ORDER BY %s
-		LIMIT $1 OFFSET $2
-	`, orderBy)
+	// Validate order direction
+	orderDirection := "DESC"
+	if order == "asc" {
+		orderDirection = "ASC"
+	} else if order == "desc" {
+		orderDirection = "DESC"
+	}
 
-	rows, err := r.pool.Query(ctx, query, limit, offset)
+	// Build query with optional category filter
+	var query string
+	var args []interface{}
+	if category != "" {
+		query = fmt.Sprintf(`
+			SELECT id, name, normalized_name, category, website_url, description,
+			       first_seen_at, last_seen_at, video_count, created_at, updated_at
+			FROM sponsors
+			WHERE category = $1
+			ORDER BY %s %s
+			LIMIT $2 OFFSET $3
+		`, sortField, orderDirection)
+		args = []interface{}{category, limit, offset}
+	} else {
+		query = fmt.Sprintf(`
+			SELECT id, name, normalized_name, category, website_url, description,
+			       first_seen_at, last_seen_at, video_count, created_at, updated_at
+			FROM sponsors
+			ORDER BY %s %s
+			LIMIT $1 OFFSET $2
+		`, sortField, orderDirection)
+		args = []interface{}{limit, offset}
+	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, db.WrapError(err, "list sponsors")
 	}

@@ -130,41 +130,17 @@ func (h *SponsorHandler) handleListSponsors(w http.ResponseWriter, r *http.Reque
 	// Get optional category filter
 	category := r.URL.Query().Get("category")
 
-	// Fetch sponsors from repository
-	sponsors, err := h.sponsorRepo.ListSponsors(r.Context(), sortBy, limit, offset)
+	// Fetch sponsors from repository with filtering and sorting handled at database level
+	sponsors, err := h.sponsorRepo.ListSponsors(r.Context(), sortBy, order, category, limit, offset)
 	if err != nil {
 		h.logger.Error("failed to list sponsors", "error", err)
 		sendError(w, http.StatusInternalServerError, "internal server error", "failed to list sponsors", nil)
 		return
 	}
 
-	// Filter by category if specified
-	filteredSponsors := sponsors
-	if category != "" {
-		filteredSponsors = make([]*models.Sponsor, 0)
-		for _, s := range sponsors {
-			if s.Category != nil && strings.EqualFold(*s.Category, category) {
-				filteredSponsors = append(filteredSponsors, s)
-			}
-		}
-	}
-
-	// Reverse order if asc (repository always returns desc for video_count, name uses ASC in repo)
-	if (sortBy == "video_count" || sortBy == "last_seen" || sortBy == "created") && order == "asc" {
-		// Reverse the slice
-		for i, j := 0, len(filteredSponsors)-1; i < j; i, j = i+1, j-1 {
-			filteredSponsors[i], filteredSponsors[j] = filteredSponsors[j], filteredSponsors[i]
-		}
-	} else if sortBy == "name" && order == "desc" {
-		// Reverse for name when desc is requested (repo returns ASC by default)
-		for i, j := 0, len(filteredSponsors)-1; i < j; i, j = i+1, j-1 {
-			filteredSponsors[i], filteredSponsors[j] = filteredSponsors[j], filteredSponsors[i]
-		}
-	}
-
 	response := map[string]interface{}{
-		"items":  filteredSponsors,
-		"total":  len(filteredSponsors),
+		"items":  sponsors,
+		"total":  len(sponsors),
 		"limit":  limit,
 		"offset": offset,
 	}
