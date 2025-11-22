@@ -252,7 +252,7 @@ func loadConfig() *Config {
 
 	// Parse boolean config
 	enrichmentEnabled := getEnvBool("ENRICHMENT_ENABLED", true)
-	sponsorDetectionEnabled := getEnvBool("SPONSOR_DETECTION_ENABLED", true)
+	sponsorDetectionEnabled := getEnvBool("SPONSOR_DETECTION_ENABLED", false)
 
 	// Sponsor detection config
 	sponsorDetectionWorkers := getEnvInt("SPONSOR_DETECTION_WORKERS", 1)
