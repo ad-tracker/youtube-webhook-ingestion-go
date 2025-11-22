@@ -7,8 +7,9 @@ import (
 
 // Task types
 const (
-	TypeEnrichVideo   = "enrichment:video"
-	TypeEnrichChannel = "enrichment:channel"
+	TypeEnrichVideo      = "enrichment:video"
+	TypeEnrichChannel    = "enrichment:channel"
+	TypeSponsorDetection = "sponsor_detection:video"
 )
 
 // EnrichVideoPayload is the payload for video enrichment tasks
@@ -83,6 +84,51 @@ func (p *EnrichChannelPayload) Marshal() ([]byte, error) {
 // UnmarshalEnrichChannelPayload deserializes JSON to payload
 func UnmarshalEnrichChannelPayload(data []byte) (*EnrichChannelPayload, error) {
 	var payload EnrichChannelPayload
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
+	}
+	return &payload, nil
+}
+
+// SponsorDetectionPayload is the payload for sponsor detection tasks
+type SponsorDetectionPayload struct {
+	VideoID        string                 `json:"video_id"`
+	Title          string                 `json:"title"`
+	Description    string                 `json:"description"`
+	DetectionJobID string                 `json:"detection_job_id"` // UUID as string
+	Metadata       map[string]interface{} `json:"metadata"`
+}
+
+// NewSponsorDetectionTask creates a new sponsor detection task payload
+func NewSponsorDetectionTask(videoID, title, description, detectionJobID string, metadata map[string]interface{}) (*SponsorDetectionPayload, error) {
+	if videoID == "" {
+		return nil, fmt.Errorf("video ID is required")
+	}
+	if detectionJobID == "" {
+		return nil, fmt.Errorf("detection job ID is required")
+	}
+
+	if metadata == nil {
+		metadata = make(map[string]interface{})
+	}
+
+	return &SponsorDetectionPayload{
+		VideoID:        videoID,
+		Title:          title,
+		Description:    description,
+		DetectionJobID: detectionJobID,
+		Metadata:       metadata,
+	}, nil
+}
+
+// Marshal serializes the payload to JSON
+func (p *SponsorDetectionPayload) Marshal() ([]byte, error) {
+	return json.Marshal(p)
+}
+
+// UnmarshalSponsorDetectionPayload deserializes JSON to payload
+func UnmarshalSponsorDetectionPayload(data []byte) (*SponsorDetectionPayload, error) {
+	var payload SponsorDetectionPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
 	}
