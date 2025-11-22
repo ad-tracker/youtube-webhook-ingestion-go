@@ -277,7 +277,7 @@ func (h *EnrichmentHandler) HandleSponsorDetectionTask() asynq.HandlerFunc {
 		if !ok || ollamaClient == nil {
 			errMsg := "ollama client not configured"
 			h.sponsorDetectionRepo.UpdateDetectionJobStatus(ctx, detectionJobID, "failed", &errMsg)
-			return fmt.Errorf(errMsg)
+			return fmt.Errorf("ollama client not configured")
 		}
 
 		// Start timing

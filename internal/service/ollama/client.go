@@ -103,7 +103,7 @@ func (c *Client) AnalyzeVideoForSponsors(ctx context.Context, title, description
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, "", fmt.Errorf("Ollama API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, "", fmt.Errorf("ollama API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	// Read response body
