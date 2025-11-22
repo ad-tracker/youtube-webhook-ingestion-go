@@ -16,10 +16,16 @@ import (
 	"ad-tracker/youtube-webhook-ingestion/internal/model"
 )
 
+// QuotaTracker is an interface for tracking quota usage
+type QuotaTracker interface {
+	RecordQuotaUsage(ctx context.Context, quotaCost int, operationType string) error
+}
+
 // Client wraps the YouTube Data API v3 client
 type Client struct {
-	service *youtube.Service
-	apiKey  string
+	service      *youtube.Service
+	apiKey       string
+	quotaTracker QuotaTracker
 }
 
 // NewClient creates a new YouTube API client
@@ -34,9 +40,15 @@ func NewClient(apiKey string) (*Client, error) {
 	}
 
 	return &Client{
-		service: service,
-		apiKey:  apiKey,
+		service:      service,
+		apiKey:       apiKey,
+		quotaTracker: nil, // Can be set later with SetQuotaTracker
 	}, nil
+}
+
+// SetQuotaTracker sets the quota tracker for this client
+func (c *Client) SetQuotaTracker(tracker QuotaTracker) {
+	c.quotaTracker = tracker
 }
 
 // FetchVideos retrieves comprehensive data for up to 50 videos in a single batch
@@ -69,11 +81,18 @@ func (c *Client) FetchVideos(ctx context.Context, videoIDs []string) ([]*model.V
 		return nil, 0, fmt.Errorf("failed to fetch videos from YouTube API: %w", err)
 	}
 
-	// Quota cost calculation:
-	// videos.list base cost = 1 unit
-	// Each additional part beyond the first adds approximately 2 units
-	// For 8 parts, typical cost is ~5-6 units
-	quotaCost := 5 // Conservative estimate
+	// Quota cost calculation per Google's official documentation:
+	// videos.list base cost = 1 unit (regardless of parts requested)
+	// Source: https://developers.google.com/youtube/v3/determine_quota_cost
+	quotaCost := 1
+
+	// Track quota usage for Videos.List API call
+	// Per Google documentation: videos.list costs 1 unit
+	if c.quotaTracker != nil {
+		if err := c.quotaTracker.RecordQuotaUsage(ctx, quotaCost, "videos_list"); err != nil {
+			log.Printf("[YouTube Client] Warning: failed to record videos.list quota usage: %v", err)
+		}
+	}
 
 	enrichments := make([]*model.VideoEnrichment, 0, len(response.Items))
 
@@ -91,7 +110,7 @@ func (c *Client) mapVideoToEnrichment(video *youtube.Video, partsRequested []str
 		VideoID:           video.Id,
 		APIResponseEtag:   strPtr(etag),
 		APIPartsRequested: partsRequested,
-		QuotaCost:         5, // Will be set by caller
+		QuotaCost:         1, // Official quota cost per Google documentation
 		RawAPIResponse:    make(map[string]interface{}),
 	}
 
@@ -405,14 +424,24 @@ func (c *Client) GetChannelDetails(ctx context.Context, channelID string) (*Chan
 		return nil, fmt.Errorf("failed to fetch channel from YouTube API: %w", err)
 	}
 
+	// Track quota usage for Channels.List API call
+	// Per Google documentation: channels.list costs 1 unit
+	if c.quotaTracker != nil {
+		if err := c.quotaTracker.RecordQuotaUsage(ctx, 1, "channels_list"); err != nil {
+			log.Printf("[YouTube Client] Warning: failed to record channels.list quota usage: %v", err)
+		}
+	}
+
 	if len(response.Items) == 0 {
 		return nil, fmt.Errorf("channel not found: %s", channelID)
 	}
 
 	channel := response.Items[0]
 
-	// Quota cost: channels.list with 6 parts ≈ 5-6 units
-	quotaCost := 6
+	// Quota cost per Google's official documentation:
+	// channels.list base cost = 1 unit (regardless of parts requested)
+	// Source: https://developers.google.com/youtube/v3/determine_quota_cost
+	quotaCost := 1
 
 	enrichment := &ChannelEnrichment{
 		ChannelID:       channel.Id,
@@ -487,13 +516,29 @@ func (c *Client) resolveChannelByHandle(ctx context.Context, handle string) (*Ch
 		return nil, fmt.Errorf("failed to search channel by handle '@%s': %w", handle, err)
 	}
 
+	// Track quota usage for Channels.List(ForHandle) API call
+	// Per Google documentation: channels.list costs 1 unit
+	if c.quotaTracker != nil {
+		if err := c.quotaTracker.RecordQuotaUsage(ctx, 1, "channels_list"); err != nil {
+			log.Printf("[YouTube Client] Warning: failed to record channels.list quota usage: %v", err)
+		}
+	}
+
 	if len(response.Items) == 0 {
 		return nil, fmt.Errorf("channel not found for handle: @%s", handle)
 	}
 
-	// Use the first result and fetch full details
+	// Use the first result and fetch full details (this makes another API call and tracks quota separately)
 	channelID := response.Items[0].Id
-	return c.GetChannelDetails(ctx, channelID)
+	enrichment, err := c.GetChannelDetails(ctx, channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update total quota cost to include both Channels.List calls (1 + 1 = 2)
+	enrichment.QuotaCost = 2
+
+	return enrichment, nil
 }
 
 // resolveChannelByUsername resolves a legacy username to channel details
@@ -512,12 +557,29 @@ func (c *Client) resolveChannelByUsername(ctx context.Context, username string) 
 		return nil, fmt.Errorf("failed to search channel by username '%s': %w", username, err)
 	}
 
+	// Track quota usage for Channels.List(ForUsername) API call
+	// Per Google documentation: channels.list costs 1 unit
+	if c.quotaTracker != nil {
+		if err := c.quotaTracker.RecordQuotaUsage(ctx, 1, "channels_list"); err != nil {
+			log.Printf("[YouTube Client] Warning: failed to record channels.list quota usage: %v", err)
+		}
+	}
+
 	if len(response.Items) == 0 {
 		return nil, fmt.Errorf("channel not found for username: %s", username)
 	}
 
+	// Use the first result and fetch full details (this makes another API call and tracks quota separately)
 	channelID := response.Items[0].Id
-	return c.GetChannelDetails(ctx, channelID)
+	enrichment, err := c.GetChannelDetails(ctx, channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update total quota cost to include both Channels.List calls (1 + 1 = 2)
+	enrichment.QuotaCost = 2
+
+	return enrichment, nil
 }
 
 // resolveChannelByCustomURL searches for a channel by custom URL
@@ -535,6 +597,14 @@ func (c *Client) resolveChannelByCustomURL(ctx context.Context, customURL string
 		return nil, fmt.Errorf("failed to search channel by custom URL '%s': %w", customURL, err)
 	}
 
+	// Track quota usage for Search.List API call
+	// Per Google documentation: search.list costs 100 units
+	if c.quotaTracker != nil {
+		if err := c.quotaTracker.RecordQuotaUsage(ctx, 100, "search_list"); err != nil {
+			log.Printf("[YouTube Client] Warning: failed to record search.list quota usage: %v", err)
+		}
+	}
+
 	if len(response.Items) == 0 {
 		return nil, fmt.Errorf("channel not found for custom URL: %s", customURL)
 	}
@@ -545,7 +615,16 @@ func (c *Client) resolveChannelByCustomURL(ctx context.Context, customURL string
 		return nil, fmt.Errorf("search result did not contain a channel ID")
 	}
 
-	return c.GetChannelDetails(ctx, channelID)
+	// Fetch full channel details (this makes another API call and tracks quota separately)
+	enrichment, err := c.GetChannelDetails(ctx, channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update total quota cost to include both Search.List (100) + Channels.List (1)
+	enrichment.QuotaCost = 101
+
+	return enrichment, nil
 }
 
 // parseYouTubeURL extracts channel identifiers from various YouTube URL formats

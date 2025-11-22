@@ -249,7 +249,7 @@ func (r *webhookEventRepository) List(ctx context.Context, filters *WebhookEvent
 	}
 
 	if len(whereClauses) > 0 {
-		whereClause = "WHERE " + fmt.Sprintf("%s", whereClauses[0])
+		whereClause = "WHERE " + whereClauses[0]
 		for i := 1; i < len(whereClauses); i++ {
 			whereClause += " AND " + whereClauses[i]
 		}

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"ad-tracker/youtube-webhook-ingestion/internal/db"
@@ -11,6 +12,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// JobFilters contains filters for listing enrichment jobs
+type JobFilters struct {
+	Status string
+	Limit  int
+	Offset int
+}
 
 // EnrichmentJobRepository defines operations for managing enrichment jobs
 type EnrichmentJobRepository interface {
@@ -43,6 +51,9 @@ type EnrichmentJobRepository interface {
 
 	// GetJobsByStatus retrieves jobs by status
 	GetJobsByStatus(ctx context.Context, status string, limit int) ([]*model.EnrichmentJob, error)
+
+	// ListJobs retrieves jobs with optional filters, returns jobs and total count
+	ListJobs(ctx context.Context, filters JobFilters) ([]*model.EnrichmentJob, int, error)
 
 	// GetJobStats retrieves job statistics
 	GetJobStats(ctx context.Context) (map[string]int, error)
@@ -331,6 +342,88 @@ func (r *enrichmentJobRepository) GetJobsByStatus(ctx context.Context, status st
 	}
 
 	return jobs, nil
+}
+
+func (r *enrichmentJobRepository) ListJobs(ctx context.Context, filters JobFilters) ([]*model.EnrichmentJob, int, error) {
+	// Set defaults
+	if filters.Limit <= 0 {
+		filters.Limit = 100
+	}
+	if filters.Offset < 0 {
+		filters.Offset = 0
+	}
+
+	// Build WHERE clause for both queries
+	whereClause := ""
+	countArgs := make([]interface{}, 0)
+	if filters.Status != "" {
+		whereClause = " WHERE status = $1"
+		countArgs = append(countArgs, filters.Status)
+	}
+
+	// Get total count
+	countQuery := "SELECT COUNT(*)::int FROM enrichment_jobs" + whereClause
+	var total int
+	err := r.pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
+	if err != nil {
+		return nil, 0, db.WrapError(err, "count jobs")
+	}
+
+	// Build main query
+	query := `
+		SELECT id, asynq_task_id, job_type, video_id, status, priority,
+		       scheduled_at, started_at, completed_at,
+		       attempts, max_attempts, next_retry_at,
+		       error_message, error_stack_trace, metadata,
+		       created_at, updated_at
+		FROM enrichment_jobs
+	` + whereClause
+
+	// Order by created_at DESC
+	query += " ORDER BY created_at DESC"
+
+	// Add limit and offset
+	args := make([]interface{}, 0)
+	args = append(args, countArgs...)
+	argIndex := len(args) + 1
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
+	args = append(args, filters.Limit, filters.Offset)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, db.WrapError(err, "list jobs")
+	}
+	defer rows.Close()
+
+	var jobs []*model.EnrichmentJob
+	for rows.Next() {
+		job := &model.EnrichmentJob{}
+		var metadataJSON []byte
+
+		err := rows.Scan(
+			&job.ID, &job.AsynqTaskID, &job.JobType, &job.VideoID,
+			&job.Status, &job.Priority,
+			&job.ScheduledAt, &job.StartedAt, &job.CompletedAt,
+			&job.Attempts, &job.MaxAttempts, &job.NextRetryAt,
+			&job.ErrorMessage, &job.ErrorStackTrace, &metadataJSON,
+			&job.CreatedAt, &job.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, db.WrapError(err, "scan job")
+		}
+
+		if len(metadataJSON) > 0 {
+			json.Unmarshal(metadataJSON, &job.Metadata)
+		}
+
+		jobs = append(jobs, job)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, db.WrapError(err, "iterate jobs")
+	}
+
+	return jobs, total, nil
 }
 
 func (r *enrichmentJobRepository) GetJobStats(ctx context.Context) (map[string]int, error) {
